@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>مؤشر استجابة المواقع - 2024/2025</title>
+    <title>مؤشر استجابة المواقع لرفع المستخلصات - 2024/2025</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
 
@@ -39,6 +39,7 @@
         h1 { color: #0056b3; margin: 0; font-size: 24px; font-weight: 700; }
         h2 { color: #555; margin: 5px 0 0 0; font-size: 16px; }
 
+        /* لوحة التحكم */
         .admin-panel {
             background: #2c3e50;
             color: white;
@@ -52,7 +53,7 @@
             gap: 10px;
         }
         
-        .admin-controls { display: none; gap: 10px; }
+        .admin-controls { display: none; gap: 10px; flex-wrap: wrap; }
         
         button {
             padding: 8px 15px;
@@ -62,12 +63,15 @@
             font-family: 'Tajawal', sans-serif;
             font-weight: bold;
             transition: 0.3s;
+            margin-bottom: 5px;
         }
 
         .btn-login { background: #3498db; color: white; }
         .btn-logout { background: #e74c3c; color: white; }
         .btn-save { background: #27ae60; color: white; }
         .btn-reset { background: #f39c12; color: white; font-size: 12px; }
+        /* زر الشهر الجديد */
+        .btn-new-month { background: #8e44ad; color: white; border: 1px solid #fff; }
         
         button:hover { opacity: 0.9; transform: translateY(-1px); }
 
@@ -88,7 +92,6 @@
             vertical-align: middle;
         }
 
-        /* تثبيت الأعمدة */
         th:first-child, td:first-child,
         th:nth-child(2), td:nth-child(2) {
             position: sticky;
@@ -107,14 +110,12 @@
             color: white;
         }
 
-        /* تنسيق وضع التعديل */
         body.editing-mode .editable {
             border: 2px dashed #3498db;
             cursor: pointer;
             background-color: #f0f8ff;
         }
         
-        /* جعل العناوين قابلة للتعديل بوضوح */
         body.editing-mode th.editable-header {
             border: 2px dashed #f1c40f;
             cursor: pointer;
@@ -165,10 +166,13 @@
             <button class="btn-login" onclick="adminLogin()">تسجيل دخول</button>
         </div>
         <div id="adminControls" class="admin-controls">
-            <span style="font-size:12px; color:#bdc3c7;">اضغط على اسم الشهر لتعديله، وعلى (✔/✘) مرتين للتبديل</span>
+            <button class="btn-new-month" onclick="addNewMonthAutomatic()">📅 إضافة الشهر الحالي وحذف القديم</button>
             <button class="btn-save" onclick="saveToFirebase()">☁ حفظ التغييرات</button>
-            <button class="btn-reset" onclick="uploadInitialData()">⚠ تحديث الهيكلة (مسح البيانات)</button>
+            <button class="btn-reset" onclick="uploadInitialData()">⚠ إعادة ضبط الجدول (Reset)</button>
             <button class="btn-logout" onclick="location.reload()">خروج</button>
+            <div style="width: 100%; font-size:12px; color:#bdc3c7; margin-top:5px;">
+                تعليمات: زر "إضافة الشهر الحالي" سيقوم بإضافة هذا الشهر ووضع علامة (✘) للجميع، ويحذف الشهر رقم 13 تلقائياً.
+            </div>
         </div>
     </div>
 
@@ -221,11 +225,11 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     
-    // الهيكل الجديد: يحتوي على (monthNames) للعناوين و (rows) للبيانات
     window.currentData = { monthNames: [], rows: [] };
     window.isAdmin = false;
 
-    const dataRef = ref(db, 'kpi_data_v2'); // غيرنا اسم المسار لضمان تحديث الهيكلة
+    // القراءة من المسار الجديد
+    const dataRef = ref(db, 'kpi_data_v2'); 
     onValue(dataRef, (snapshot) => {
         const data = snapshot.val();
         const loader = document.getElementById('loader');
@@ -237,7 +241,7 @@
             loader.style.display = 'none';
             table.style.display = 'table';
         } else {
-            loader.innerHTML = "يرجى تسجيل الدخول والضغط على 'تحديث الهيكلة' لإنشاء الجدول الجديد.";
+            loader.innerHTML = "النظام جاهز. سجل الدخول واضغط 'إعادة ضبط الجدول' للبدء.";
         }
     });
 
@@ -249,34 +253,75 @@
     };
 
     window.uploadInitialData = function() {
-        if(confirm("تحذير: هذا الخيار سيقوم بإعادة ضبط الجدول وأسماء الشهور. هل أنت متأكد؟")) {
+        if(confirm("هل أنت متأكد؟ سيتم مسح البيانات الحالية وإعادة تعيين الجدول.")) {
             const initialData = {
-                // هنا نحدد أسماء الشهور القابلة للتعديل
                 monthNames: [
                     "أكتوبر 25", "سبتمبر 25", "أغسطس 25", "يوليو 25", 
                     "يونيو 25", "مايو 25", "أبريل 24", "مارس 25", 
                     "فبراير 25", "يناير 25", "ديسمبر 24", "نوفمبر 24"
                 ],
                 rows: [
-                    { name: "مستشفى ضبا العام", cont: "الخليجية الأولي", late: 0, months: ["✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: "" },
-                    { name: "مستشفى أملج العام", cont: "الخليجية الأولى", late: 0, months: ["✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: " " },
-                    { name: "مستشفى حقل العام", cont: "الخليجية الأولى", late: 0, months: ["✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: " " },
+                    { name: "مستشفى ضبا العام", cont: "شركة الخليجية الأولي", late: 0, months: ["✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: "" },
+                    { name: "مستشفى أملج العام", cont: "الخليجية الأولى", late: 0, months: ["✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: "يوجد ملاحظات سابقة" },
+                    { name: "مستشفى حقل العام", cont: "الخليجية الأولى", late: 0, months: ["✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: "سجل سابق غير منتظم" },
                     { name: "مستشفى البدع العام", cont: "الخليجية الأولى", late: 1, months: ["✘","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: "تأخر الرفع لشهر أكتوبر" },
                     { name: "مستشفى أشواق العام", cont: "الخليجية الأولى", late: 0, months: ["✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: "" },
                     { name: "مستشفى تيماء العام", cont: "الخليجية الأولى", late: 0, months: ["✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: "" },
                     { name: "مستشفى أبوراكة العام", cont: "الخليجية الأولى", late: 0, months: ["✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: "" },
                     { name: "مستشفى الملك فهد", cont: "الخليجية الأولى", late: 0, months: ["✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: "" },
-                    { name: "مستشفى الصحة النفسية", cont: " العرفج", late: 12, months: ["✘","✘","✘","✘","✘","✘","✘","✘","✘","✘","✘","✘"], notes: "  يلزم نقل العقد من فرع وزاة الصحة الى تجمع تبوك الصحي " },
-                    { name: "مستشفى الملك خالد", cont: "رجب وسلسله", late: 1, months: ["✘","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: "تأخر الرفع لشهر أكتوبر" },
-                    { name: "مستشفى الولادة والأطفال", cont: "المجال العربي", late: 1, months: ["✘","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes:"تأخر الرفع لشهر أكتوبر" },
-                    { name: "مستشفى الوجه", cont: "دار المعدات الطبية", late: 1, months: ["✘","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes:"تأخر الرفع لشهر أكتوبر" }
+                    { name: "مستشفى الصحة النفسية", cont: "سراكو / العرفج", late: 12, months: ["✘","✘","✘","✘","✘","✘","✘","✘","✘","✔","✔","✔"], notes: "يلزم نقل العقد" },
+                    { name: "مستشفى الملك خالد", cont: "رجب وسلسله", late: 1, months: ["✘","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: "تمديد 10% / شراء مباشر" },
+                    { name: "مستشفى الولادة والأطفال", cont: "المجال العربي", late: 1, months: ["✘","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: "" },
+                    { name: "مستشفى الوجه", cont: "دار المعدات الطبية", late: 1, months: ["✘","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"], notes: "مستخلصات ختامية متأخرة" }
                 ]
             };
-            
             window.currentData = initialData;
             window.saveToFirebase();
         }
     };
+
+    // --- الوظيفة الجديدة: إضافة الشهر الحالي تلقائياً ---
+    window.addNewMonthAutomatic = function() {
+        if (!window.isAdmin) return;
+
+        // 1. حساب اسم الشهر الحالي بالعربي والسنة
+        const date = new Date();
+        const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+        const currentMonthName = monthsAr[date.getMonth()];
+        const currentYearShort = date.getFullYear().toString().slice(-2);
+        const newColumnTitle = `${currentMonthName} ${currentYearShort}`;
+
+        // التحقق من التكرار (هل الشهر موجود بالفعل؟)
+        if (window.currentData.monthNames[0] === newColumnTitle) {
+            alert(`الشهر "${newColumnTitle}" موجود بالفعل في بداية الجدول!`);
+            return;
+        }
+
+        if(!confirm(`سيتم إضافة شهر جديد: "${newColumnTitle}"\nوحذف أقدم شهر ليصبح المجموع 12.\nسيتم وضع الحالة (✘) للجميع.\nهل تريد المتابعة؟`)) {
+            return;
+        }
+
+        // 2. إضافة الشهر الجديد في بداية مصفوفة العناوين
+        window.currentData.monthNames.unshift(newColumnTitle);
+
+        // 3. إضافة حالة "✘" في بداية كل صف للمستشفيات
+        window.currentData.rows.forEach(row => {
+            row.months.unshift("✘");
+        });
+
+        // 4. الحذف: إذا زاد العدد عن 12، نحذف الأخير
+        if (window.currentData.monthNames.length > 12) {
+            window.currentData.monthNames.pop(); // حذف عنوان آخر شهر
+            window.currentData.rows.forEach(row => {
+                row.months.pop(); // حذف حالة آخر شهر
+            });
+        }
+
+        // 5. تحديث الجدول والحفظ
+        renderTable(window.currentData);
+        window.saveToFirebase(); // حفظ التغييرات فوراً
+    };
+
 </script>
 
 <script>
@@ -294,7 +339,6 @@
     }
 
     function renderTable(data) {
-        // أولاً: بناء العناوين (Headers)
         const headerRow = document.getElementById('headerRow');
         headerRow.innerHTML = `
             <th style="min-width: 150px;">الموقع / المستشفى</th>
@@ -302,17 +346,16 @@
             <th style="width: 60px;">المتأخرة</th>
         `;
 
-        // إضافة عناوين الشهور القابلة للتعديل
         if(data.monthNames) {
             data.monthNames.forEach((monthName, index) => {
-                headerRow.innerHTML += `<th class="editable-header" onclick="editHeader(${index})">${monthName}</th>`;
+                // تظليل أول شهر لتمييزه أنه الجديد
+                let style = index === 0 ? "border-bottom: 3px solid #e74c3c;" : "";
+                headerRow.innerHTML += `<th class="editable-header" style="${style}" onclick="editHeader(${index})">${monthName}</th>`;
             });
         }
 
         headerRow.innerHTML += `<th style="min-width: 200px;">ملاحظات هامة</th>`;
 
-
-        // ثانياً: بناء الصفوف (Body)
         const tbody = document.getElementById('tableBody');
         tbody.innerHTML = '';
 
@@ -341,7 +384,6 @@
         }
     }
 
-    // تعديل اسم الشهر
     window.editHeader = function(index) {
         if (!window.isAdmin) return;
         let oldVal = window.currentData.monthNames[index];
@@ -362,7 +404,6 @@
         }
     };
 
-    // هذا اختياري اذا حبيت تعدل الرموز يدويا
     window.editMonthText = function(rowIndex, monthIndex) { }
 
     window.toggleStatus = function(rowIndex, monthIndex) {
