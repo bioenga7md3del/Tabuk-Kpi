@@ -24,29 +24,49 @@
             overflow-x: auto;
         }
 
+        /* تنسيق الرأس والشعار */
         header {
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             margin-bottom: 30px;
-            border-bottom: 2px solid #0056b3;
+            border-bottom: 3px solid #0056b3;
             padding-bottom: 20px;
+        }
+
+        .header-text {
+            text-align: right;
+            flex-grow: 1;
+        }
+
+        .logo-container {
+            margin-left: 20px;
+        }
+
+        .logo-container img {
+            max-height: 100px; /* حجم مناسب للشعار */
+            width: auto;
         }
 
         h1 {
             color: #0056b3;
             margin: 0;
-            font-size: 24px;
+            font-size: 26px;
+            font-weight: 700;
         }
 
         h2 {
-            color: #666;
+            color: #555;
             margin: 5px 0 0 0;
-            font-size: 16px;
+            font-size: 18px;
         }
 
+        /* تنسيق الجدول */
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 1200px; /* لضمان عدم انضغاط الجدول */
+            min-width: 1200px;
+            margin-top: 10px;
         }
 
         thead {
@@ -55,65 +75,68 @@
         }
 
         th, td {
-            padding: 12px 10px;
+            padding: 12px 8px;
             text-align: center;
             border-bottom: 1px solid #ddd;
             font-size: 14px;
+            vertical-align: middle;
         }
 
-        /* تثبيت العمود الأول والثاني (المستشفى والمقاول) */
+        /* تثبيت الأعمدة التعريفية */
         th:first-child, td:first-child,
         th:nth-child(2), td:nth-child(2) {
             position: sticky;
             background-color: #f9f9f9;
-            z-index: 1;
+            z-index: 2;
             font-weight: bold;
             text-align: right;
+            border-left: 2px solid #ddd;
         }
         
         th:first-child, td:first-child { right: 0; }
-        th:nth-child(2), td:nth-child(2) { right: 140px; }
+        th:nth-child(2), td:nth-child(2) { right: 150px; }
         
         thead th:first-child, thead th:nth-child(2) {
-            background-color: #004494; /* لون أغمق للعناوين المثبتة */
+            background-color: #004494;
             color: white;
         }
 
-        tr:hover {
+        tr:hover td {
             background-color: #f1f1f1;
         }
 
-        /* تنسيق الحالات */
+        /* تنسيق الحالات - تم التأكيد على اللون الأحمر */
         .status-ok {
             color: #28a745;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 20px;
         }
 
         .status-late {
-            color: #dc3545;
+            color: #dc3545; /* أحمر صريح */
             font-weight: bold;
-            font-size: 18px;
-        }
-
-        .status-pending {
-            color: #ffc107;
-            font-weight: bold;
+            font-size: 20px;
         }
 
         .note-text {
-            font-size: 11px;
-            color: #666;
+            font-size: 12px;
+            color: #444;
             text-align: right;
-            max-width: 200px;
+            max-width: 220px;
             line-height: 1.4;
+            background-color: #fff3cd;
+            padding: 5px;
+            border-radius: 4px;
         }
 
         .badge {
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 12px;
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: bold;
             color: white;
+            min-width: 20px;
         }
         .badge-red { background-color: #dc3545; }
         .badge-green { background-color: #28a745; }
@@ -122,36 +145,59 @@
         .legend {
             display: flex;
             gap: 20px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             font-size: 14px;
             background: #e9ecef;
             padding: 10px;
             border-radius: 5px;
+            border: 1px solid #ced4da;
         }
-        .legend-item span { margin-left: 5px; }
 
+        /* التذييل */
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            font-size: 16px;
+            color: #0056b3;
+            font-weight: bold;
+        }
+
+        @media print {
+            body { padding: 0; background: white; }
+            .container { box-shadow: none; width: 100%; margin: 0; }
+            th, td { border: 1px solid #999; }
+            .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
     <header>
-        <h1>مؤشر استجابة المواقع لرفع مستخلصات الصيانة الطبية</h1>
-        <h2>للسنة المالية 2024 / 2025</h2>
+        <div class="header-text">
+            <h1>مؤشر استجابة المواقع لرفع مستخلصات الصيانة الطبية</h1>
+            <h2>السنة المالية 2024 / 2025</h2>
+        </div>
+        <div class="logo-container">
+            <img src="TabukCluster.jpeg" alt="شعار تجمع تبوك الصحي">
+        </div>
     </header>
 
     <div class="legend">
-        <div class="legend-item"><span class="status-ok">✔</span> تم الرفع / مكتمل</div>
-        <div class="legend-item"><span class="status-late">✘</span> متأخر / لم يرد / ملاحظات</div>
-        <div class="legend-item"><strong>العدد:</strong> عدد المستخلصات المتأخرة</div>
+        <div><span class="status-ok">✔</span> تم الرفع / مكتمل</div>
+        <div><span class="status-late">✘</span> متأخر / لم يرد / ملاحظات</div>
+        <div><strong>العمود الأحمر:</strong> عدد المستخلصات المتأخرة</div>
     </div>
 
     <table>
         <thead>
             <tr>
-                <th style="min-width: 140px;">الموقع / المستشفى</th>
-                <th style="min-width: 140px;">المقاول</th>
-                <th style="width: 80px;">المتأخرة</th>
+                <th style="min-width: 150px;">الموقع / المستشفى</th>
+                <th style="min-width: 150px;">المقاول</th>
+                <th style="width: 60px;">المتأخرة</th>
+                
                 <th>أكتوبر 25</th>
                 <th>سبتمبر 25</th>
                 <th>أغسطس 25</th>
@@ -164,6 +210,7 @@
                 <th>يناير 25</th>
                 <th>ديسمبر 24</th>
                 <th>نوفمبر 24</th>
+                
                 <th style="min-width: 200px;">ملاحظات هامة</th>
             </tr>
         </thead>
@@ -175,7 +222,7 @@
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
-                <td class="note-text">-</td>
+                <td></td>
             </tr>
 
             <tr>
@@ -185,7 +232,7 @@
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
-                <td class="note-text">-</td>
+                <td class="note-text">يوجد ملاحظات سابقة (×)</td>
             </tr>
 
              <tr>
@@ -195,7 +242,7 @@
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
-                <td class="note-text">-</td>
+                <td class="note-text">سجل سابق غير منتظم (×)</td>
             </tr>
 
             <tr>
@@ -205,7 +252,7 @@
                 <td class="status-late">✘</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
-                <td class="note-text">تأخر في أكتوبر</td>
+                <td class="note-text">تأخر الرفع لشهر أكتوبر</td>
             </tr>
 
             <tr>
@@ -215,7 +262,7 @@
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
-                <td class="note-text">-</td>
+                <td></td>
             </tr>
 
             <tr>
@@ -225,19 +272,9 @@
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
-                <td class="note-text">-</td>
+                <td></td>
             </tr>
 
-            <tr>
-                <td>الفريق المتحرك</td>
-                <td>الخليجية الأولى</td>
-                <td><span class="badge badge-red">2</span></td>
-                <td class="status-late">..</td><td class="status-late">..</td><td class="status-late">..</td><td class="status-late">..</td>
-                <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
-                <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
-                <td class="note-text">-</td>
-            </tr>
-            
             <tr>
                 <td>مستشفى أبوراكة العام</td>
                 <td>الخليجية الأولى</td>
@@ -245,7 +282,7 @@
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
-                <td class="note-text">-</td>
+                <td></td>
             </tr>
 
             <tr>
@@ -255,7 +292,7 @@
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
-                <td class="note-text">-</td>
+                <td></td>
             </tr>
 
             <tr>
@@ -264,8 +301,8 @@
                 <td><span class="badge badge-red">12</span></td>
                 <td class="status-late">✘</td><td class="status-late">✘</td><td class="status-late">✘</td><td class="status-late">✘</td>
                 <td class="status-late">✘</td><td class="status-late">✘</td><td class="status-late">✘</td><td class="status-late">✘</td>
-                <td class="status-late">✘</td><td class="status-ok">✘</td><td class="status-ok">✘</td><td class="status-ok">✘</td>
-                <td class="note-text">تم الرفع من المستشفى ولكن يلزم نقل العقد من فرع الوزارة الي تجمع تبوك</td>
+                <td class="status-late">✘</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
+                <td class="note-text">تم الرفع من المستشفى ولكن يلزم نقل العقد من فرع الوزارة لتجمع تبوك</td>
             </tr>
 
             <tr>
@@ -275,7 +312,7 @@
                 <td class="status-late">✘</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
-                <td class="note-text">تأخر في أكتوبر</td>
+                <td class="note-text">تمديد 10% / شراء مباشر / مستخلصات ختامية</td>
             </tr>
 
              <tr>
@@ -285,7 +322,7 @@
                 <td class="status-late">✘</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
-                <td class="note-text">تأخر في أكتوبر</td>
+                <td></td>
             </tr>
 
             <tr>
@@ -295,11 +332,15 @@
                 <td class="status-late">✘</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
                 <td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td><td class="status-ok">✔</td>
-                <td class="note-text">تأخر في أكتوبر</td>
+                <td class="note-text">مستخلصات ختامية متأخرة</td>
             </tr>
 
         </tbody>
     </table>
+
+    <footer>
+        تم الاعداد عن طريق قسم الصيانة الطبية بتجمع تبوك الصحي
+    </footer>
 </div>
 
 </body>
