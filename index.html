@@ -76,7 +76,6 @@
         .btn-reset { background: #f39c12; color: white; font-size: 12px; }
         .btn-new-month { background: #8e44ad; color: white; border: 1px solid #fff; }
         
-        /* زر الطباعة */
         .btn-print { 
             background: #fff; 
             color: #2c3e50; 
@@ -121,17 +120,8 @@
             color: white;
         }
 
-        body.editing-mode .editable {
-            border: 2px dashed #3498db;
-            cursor: pointer;
-            background-color: #f0f8ff;
-        }
-        
-        body.editing-mode th.editable-header {
-            border: 2px dashed #f1c40f;
-            cursor: pointer;
-            background-color: #2980b9;
-        }
+        body.editing-mode .editable { border: 2px dashed #3498db; cursor: pointer; background-color: #f0f8ff; }
+        body.editing-mode th.editable-header { border: 2px dashed #f1c40f; cursor: pointer; background-color: #2980b9; }
 
         .status-ok { color: #28a745; font-weight: bold; font-size: 20px; }
         .status-late { color: #dc3545; font-weight: bold; font-size: 20px; }
@@ -160,16 +150,61 @@
         
         #loader { text-align: center; padding: 20px; font-weight: bold; color: #0056b3; }
 
-        /* إعدادات الطباعة */
+        /* =========================================
+           تعديلات الطباعة الحاسمة (Magic Print CSS)
+           ========================================= */
         @media print {
-            .admin-panel { display: none !important; }
-            .container { box-shadow: none; width: 100%; margin: 0; padding: 0; }
-            body { background-color: white; padding: 0; margin: 0; }
-            th, td { border: 1px solid #999 !important; font-size: 11px; padding: 5px; }
-            /* لضمان ظهور الألوان عند الطباعة */
-            .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            thead { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            /* إخفاء روابط الصفحة */
+            @page {
+                size: landscape; /* إجبار الطابعة على الوضع الأفقي */
+                margin: 5mm; /* تقليل الهوامش لأقصى حد */
+            }
+
+            body {
+                background-color: white;
+                /* تصغير المحتوى بنسبة 20% لضمان دخول الجدول في الصفحة */
+                transform: scale(0.80);
+                transform-origin: top right; /* التثبيت من الزاوية اليمنى العليا */
+                width: 125%; /* تعويض التصغير لتعبئة الصفحة */
+                
+                -webkit-print-color-adjust: exact !important; /* ضمان طباعة الألوان */
+                print-color-adjust: exact !important;
+            }
+
+            .container {
+                box-shadow: none;
+                margin: 0;
+                padding: 0;
+                width: 100% !important;
+                max-width: none !important;
+                overflow: visible !important; /* إزالة أشرطة التمرير */
+            }
+
+            /* إخفاء العناصر غير المرغوبة */
+            .admin-panel, .btn-print, #loginSection {
+                display: none !important;
+            }
+
+            /* تحسين مظهر الجدول للورق */
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            th, td {
+                border: 1px solid #000 !important; /* حدود سوداء واضحة */
+                font-size: 12px; /* خط أصغر قليلاً */
+                padding: 5px !important;
+                color: black !important;
+            }
+
+            /* إصلاح رؤوس الجدول */
+            thead {
+                background-color: #0056b3 !important;
+                color: white !important;
+                -webkit-print-color-adjust: exact;
+            }
+            
+            /* إزالة الروابط */
             a { text-decoration: none; color: black; }
         }
     </style>
