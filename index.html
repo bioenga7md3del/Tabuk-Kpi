@@ -83,6 +83,34 @@
         }
         .btn-print:hover { background: #ecf0f1; }
 
+        /* تنسيق منطقة الفلتر */
+        .filter-section {
+            display: flex;
+            align-items: center;
+            background-color: #e9ecef;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ced4da;
+        }
+
+        .filter-label {
+            font-weight: bold;
+            margin-left: 10px;
+            color: #0056b3;
+        }
+
+        .filter-select {
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-family: 'Tajawal', sans-serif;
+            font-size: 14px;
+            min-width: 200px;
+            cursor: pointer;
+        }
+
+        /* الجدول */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -93,7 +121,7 @@
         thead { background-color: #0056b3; color: white; }
 
         th, td {
-            padding: 8px 5px; /* تقليل الهوامش قليلاً */
+            padding: 8px 5px;
             text-align: center;
             border-bottom: 1px solid #ddd;
             font-size: 14px;
@@ -133,12 +161,15 @@
             padding: 4px; border-radius: 4px; max-width: 200px; margin: auto;
         }
         
-        /* تنسيق نوع العقد */
         .type-medical { color: #0056b3; font-weight: bold; font-size: 13px; background-color: #e3f2fd; }
         .type-non-medical { color: #d35400; font-weight: bold; font-size: 13px; background-color: #fdebd0; }
 
-        /* فاصل بين المستشفيات */
         .hospital-separator { border-bottom: 2px solid #666 !important; }
+
+        .legend {
+            display: flex; gap: 20px; font-size: 14px;
+            align-items: center;
+        }
 
         footer {
             margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;
@@ -151,14 +182,14 @@
             @page { size: landscape; margin: 5mm; }
             body { 
                 background-color: white; 
-                transform: scale(0.75); /* تصغير أكثر قليلاً لاستيعاب الصفوف الإضافية */
+                transform: scale(0.75); 
                 transform-origin: top right; 
                 width: 133%; 
                 -webkit-print-color-adjust: exact !important; 
                 print-color-adjust: exact !important; 
             }
             .container { box-shadow: none; margin: 0; padding: 0; width: 100% !important; max-width: none !important; }
-            .admin-panel, .btn-print, #loginSection { display: none !important; }
+            .admin-panel, .btn-print, #loginSection, .filter-section { display: none !important; } /* إخفاء الفلاتر عند الطباعة */
             th, td { border: 1px solid #000 !important; font-size: 11px; padding: 4px !important; color: black !important; }
             .type-medical { background-color: #e3f2fd !important; }
             .type-non-medical { background-color: #fdebd0 !important; }
@@ -183,10 +214,10 @@
         <div id="adminControls" class="admin-controls">
             <button class="btn-new-month" onclick="addNewMonthAutomatic()">📅 إضافة الشهر السابق (إقفال)</button>
             <button class="btn-save" onclick="saveToFirebase()">☁ حفظ التغييرات</button>
-            <button class="btn-reset" onclick="uploadInitialData()">⚠ إعادة بناء الجدول (طبي/غير طبي)</button>
+            <button class="btn-reset" onclick="uploadInitialData()">⚠ إعادة بناء الجدول (Reset)</button>
             <button class="btn-logout" onclick="location.reload()">خروج</button>
             <div style="width: 100%; font-size:12px; color:#bdc3c7; margin-top:5px;">
-                لكل مستشفى الآن صفان مستقلان (طبي وغير طبي).
+                لكل مستشفى صفان مستقلان (طبي وغير طبي).
             </div>
         </div>
     </div>
@@ -200,6 +231,23 @@
             <img src="TabukCluster.jpeg" alt="شعار تجمع تبوك الصحي">
         </div>
     </header>
+
+    <div class="filter-section">
+        <span class="filter-label">🌪 تصفية الجدول حسب نوع العقد:</span>
+        <select id="typeFilter" class="filter-select" onchange="applyFilter()">
+            <option value="all">عرض الكل (طبي + غير طبي)</option>
+            <option value="طبي">عقود طبية فقط</option>
+            <option value="غير طبي">عقود غير طبية فقط</option>
+        </select>
+        
+        <div style="flex-grow: 1;"></div>
+        
+        <div class="legend">
+            <div><span class="status-ok">✔</span> تم الرفع</div>
+            <div><span class="status-late">✘</span> متأخر</div>
+            <div><strong>أحمر:</strong> عدد المتأخرة</div>
+        </div>
+    </div>
 
     <div id="loader">جاري تحميل البيانات من السيرفر...</div>
 
@@ -236,8 +284,8 @@
     
     window.currentData = { monthNames: [], rows: [] };
     window.isAdmin = false;
+    window.currentFilter = 'all'; // الفلتر الافتراضي
 
-    // استخدام مسار v4 للهيكلة الجديدة
     const dataRef = ref(db, 'kpi_data_v4'); 
     onValue(dataRef, (snapshot) => {
         const data = snapshot.val();
@@ -246,11 +294,11 @@
         
         if (data && data.rows) {
             window.currentData = data;
-            renderTable(data);
+            renderTable(); // استخدام البيانات المخزنة والفلتر الحالي
             loader.style.display = 'none';
             table.style.display = 'table';
         } else {
-            loader.innerHTML = "يرجى تسجيل الدخول والضغط على 'إعادة بناء الجدول' للبدء.";
+            loader.innerHTML = "يرجى تسجيل الدخول وإعادة بناء الجدول.";
         }
     });
 
@@ -262,40 +310,18 @@
     };
 
     window.uploadInitialData = function() {
-        if(confirm("تحذير: سيتم مسح البيانات وإنشاء جدول بصفين (طبي/غير طبي) لكل مستشفى. هل أنت متأكد؟")) {
-            
-            // قائمة المستشفيات
+        if(confirm("تحذير: إعادة بناء الجدول ببيانات افتراضية. هل أنت متأكد؟")) {
             const hospitals = [
                 "مستشفى ضبا العام", "مستشفى أملج العام", "مستشفى حقل العام", 
                 "مستشفى البدع العام", "مستشفى أشواق العام", "مستشفى تيماء العام", 
                 "مستشفى أبوراكة العام", "مستشفى الملك فهد", "مستشفى الصحة النفسية", 
                 "مستشفى الملك خالد", "مستشفى الولادة والأطفال", "مستشفى الوجه"
             ];
-
             const emptyMonths = ["✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔","✔"];
-            
             let newRows = [];
-            
-            // إنشاء صفين لكل مستشفى
             hospitals.forEach(hosp => {
-                // الصف الطبي
-                newRows.push({
-                    name: hosp,
-                    type: "طبي",
-                    cont: "اسم المقاول",
-                    late: 0,
-                    months: [...emptyMonths],
-                    notes: ""
-                });
-                // الصف غير الطبي
-                newRows.push({
-                    name: hosp, // نفس الاسم ليتم دمجه
-                    type: "غير طبي",
-                    cont: "اسم المقاول",
-                    late: 0,
-                    months: [...emptyMonths],
-                    notes: ""
-                });
+                newRows.push({ name: hosp, type: "طبي", cont: "اسم المقاول", late: 0, months: [...emptyMonths], notes: "" });
+                newRows.push({ name: hosp, type: "غير طبي", cont: "اسم المقاول", late: 0, months: [...emptyMonths], notes: "" });
             });
 
             const initialData = {
@@ -314,38 +340,29 @@
 
     window.addNewMonthAutomatic = function() {
         if (!window.isAdmin) return;
-
+        // نفس كود إضافة الشهر السابق
         const date = new Date();
         date.setMonth(date.getMonth() - 1); 
-        
         const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
         const prevMonthName = monthsAr[date.getMonth()];
         const prevYearShort = date.getFullYear().toString().slice(-2);
-        
         const newColumnTitle = `${prevMonthName} ${prevYearShort}`;
 
         if (window.currentData.monthNames[0] === newColumnTitle) {
-            alert(`الشهر "${newColumnTitle}" موجود بالفعل!`);
-            return;
+            alert(`الشهر "${newColumnTitle}" موجود بالفعل!`); return;
         }
 
-        if(!confirm(`إضافة شهر جديد: "${newColumnTitle}" للجميع؟`)) {
-            return;
-        }
+        if(!confirm(`إضافة شهر جديد: "${newColumnTitle}"؟`)) { return; }
 
         window.currentData.monthNames.unshift(newColumnTitle);
-        window.currentData.rows.forEach(row => {
-            row.months.unshift("✘");
-        });
+        window.currentData.rows.forEach(row => { row.months.unshift("✘"); });
 
         if (window.currentData.monthNames.length > 12) {
             window.currentData.monthNames.pop();
-            window.currentData.rows.forEach(row => {
-                row.months.pop();
-            });
+            window.currentData.rows.forEach(row => { row.months.pop(); });
         }
 
-        renderTable(window.currentData);
+        renderTable();
         window.saveToFirebase();
     };
 
@@ -359,13 +376,22 @@
             document.body.classList.add('editing-mode');
             document.getElementById('loginSection').style.display = 'none';
             document.getElementById('adminControls').style.display = 'flex';
-            renderTable(window.currentData);
+            renderTable();
         } else {
             alert("كلمة المرور خاطئة");
         }
     }
 
-    function renderTable(data) {
+    // دالة لتطبيق الفلتر وتحديث الجدول
+    window.applyFilter = function() {
+        window.currentFilter = document.getElementById('typeFilter').value;
+        renderTable();
+    };
+
+    function renderTable() {
+        const data = window.currentData;
+        const filter = window.currentFilter; // 'all', 'طبي', 'غير طبي'
+
         const headerRow = document.getElementById('headerRow');
         headerRow.innerHTML = `
             <th style="min-width: 150px;">الموقع / المستشفى</th>
@@ -380,68 +406,74 @@
                 headerRow.innerHTML += `<th class="editable-header" style="${style}" onclick="editHeader(${index})">${monthName}</th>`;
             });
         }
-
         headerRow.innerHTML += `<th style="min-width: 180px;">ملاحظات هامة</th>`;
 
         const tbody = document.getElementById('tableBody');
         tbody.innerHTML = '';
 
         if(data.rows) {
-            // نقوم بالمرور على الصفوف.. ونحاول دمج اسم المستشفى المتكرر
-            let i = 0;
-            while (i < data.rows.length) {
-                let row = data.rows[i];
-                let nextRow = data.rows[i+1];
-                
-                // هل الصف الحالي والتالي لنفس المستشفى؟ (لعمل RowSpan)
-                let isSameHospital = (nextRow && row.name === nextRow.name);
-                
-                // --- رسم الصف الأول (طبي عادة) ---
-                const tr1 = document.createElement('tr');
-                
-                // اسم المستشفى (يدمج صفين إذا كان هناك صف تالٍ لنفس الاسم)
-                if (isSameHospital) {
-                    tr1.innerHTML += `<td rowspan="2" class="sticky-col-1" style="background-color: #fcfcfc;">${row.name}</td>`;
-                } else {
-                    // في حال كان صف واحد (نادر الحدوث مع الهيكلة الجديدة لكن للاحتياط)
-                    tr1.innerHTML += `<td class="sticky-col-1">${row.name}</td>`;
-                }
+            // تصفية البيانات أولاً حسب الفلتر
+            let rowsToRender = data.rows; // الافتراضي الكل
 
-                // بقية خلايا الصف الأول
-                appendRowData(tr1, row, i);
-                tbody.appendChild(tr1);
+            // إذا اخترنا الكل، نستخدم منطق الدمج (RowSpan)
+            if (filter === 'all') {
+                let i = 0;
+                while (i < rowsToRender.length) {
+                    let row = rowsToRender[i];
+                    let nextRow = rowsToRender[i+1];
+                    let isSameHospital = (nextRow && row.name === nextRow.name);
+                    
+                    const tr1 = document.createElement('tr');
+                    
+                    // دمج الاسم
+                    if (isSameHospital) {
+                        tr1.innerHTML += `<td rowspan="2" class="sticky-col-1" style="background-color: #fcfcfc;">${row.name}</td>`;
+                    } else {
+                        tr1.innerHTML += `<td class="sticky-col-1">${row.name}</td>`;
+                    }
 
-                // --- رسم الصف الثاني (غير طبي) إذا وجد ---
-                if (isSameHospital) {
-                    const tr2 = document.createElement('tr');
-                    // لا نضيف اسم المستشفى هنا لأنه مدمج مع السابق
-                    appendRowData(tr2, nextRow, i+1);
-                    tr2.classList.add("hospital-separator"); // خط فاصل بعد انتهاء المستشفى
-                    tbody.appendChild(tr2);
-                    i += 2; // قفزنا صفين
-                } else {
-                    tr1.classList.add("hospital-separator");
-                    i++;
+                    appendRowData(tr1, row, i); // استخدام الفهرس الأصلي i
+                    tbody.appendChild(tr1);
+
+                    if (isSameHospital) {
+                        const tr2 = document.createElement('tr');
+                        appendRowData(tr2, nextRow, i+1);
+                        tr2.classList.add("hospital-separator");
+                        tbody.appendChild(tr2);
+                        i += 2;
+                    } else {
+                        tr1.classList.add("hospital-separator");
+                        i++;
+                    }
                 }
+            } 
+            else {
+                // إذا تم اختيار فلتر (طبي أو غير طبي)، نعرض الصفوف بشكل مستقل بدون دمج
+                // لكن نحتاج نحافظ على الـ Index الأصلي عشان التعديل يتم صح
+                data.rows.forEach((row, originalIndex) => {
+                    // تحقق من الفلتر
+                    if (row.type === filter) {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML += `<td class="sticky-col-1">${row.name}</td>`;
+                        appendRowData(tr, row, originalIndex);
+                        tr.classList.add("hospital-separator");
+                        tbody.appendChild(tr);
+                    }
+                });
             }
         }
     }
 
     function appendRowData(tr, row, rowIndex) {
-        // نوع العقد
         let typeClass = row.type === "طبي" ? "type-medical" : "type-non-medical";
         tr.innerHTML += `<td class="sticky-col-2 ${typeClass}">${row.type}</td>`;
-
-        // المقاول (قابل للتعديل)
         tr.innerHTML += `<td class="sticky-col-3 editable" onclick="editCell(${rowIndex}, 'cont')">${row.cont}</td>`;
         
-        // المتأخرة (حساب تلقائي)
         let autoLateCount = row.months.filter(m => m.includes('✘')).length;
         row.late = autoLateCount;
         let badgeClass = row.late > 0 ? 'badge-red' : 'badge-green';
         tr.innerHTML += `<td><span class="badge ${badgeClass}">${row.late}</span></td>`;
 
-        // الشهور
         row.months.forEach((status, monthIndex) => {
             let statusClass = status.includes('✔') ? 'status-ok' : 'status-late';
             tr.innerHTML += `<td class="editable ${statusClass}" 
@@ -451,7 +483,6 @@
                              </td>`;
         });
 
-        // الملاحظات
         tr.innerHTML += `<td class="editable note-text" onclick="editCell(${rowIndex}, 'notes')">${row.notes}</td>`;
     }
 
@@ -461,7 +492,7 @@
         let newVal = prompt("تعديل اسم الشهر:", oldVal);
         if (newVal !== null) {
             window.currentData.monthNames[index] = newVal;
-            renderTable(window.currentData);
+            renderTable();
         }
     };
 
@@ -471,7 +502,7 @@
         let newVal = prompt("تعديل القيمة:", oldVal);
         if (newVal !== null) {
             window.currentData.rows[rowIndex][field] = newVal;
-            renderTable(window.currentData);
+            renderTable();
         }
     };
 
@@ -485,7 +516,7 @@
         } else {
             window.currentData.rows[rowIndex].months[monthIndex] = '✔';
         }
-        renderTable(window.currentData);
+        renderTable();
     };
 </script>
 
