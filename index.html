@@ -76,6 +76,9 @@
         .btn-reset { background: #f39c12; color: white; font-size: 12px; }
         .btn-new-month { background: #8e44ad; color: white; border: 1px solid #fff; }
         
+        /* أزرار خاصة بالأدمن العام فقط */
+        .super-admin-only { display: none; } 
+
         .btn-print { 
             background: #fff; 
             color: #2c3e50; 
@@ -83,7 +86,7 @@
         }
         .btn-print:hover { background: #ecf0f1; }
 
-        /* تنسيق منطقة الفلتر */
+        /* منطقة الفلتر */
         .filter-section {
             display: flex;
             align-items: center;
@@ -94,23 +97,12 @@
             border: 1px solid #ced4da;
         }
 
-        .filter-label {
-            font-weight: bold;
-            margin-left: 10px;
-            color: #0056b3;
-        }
-
+        .filter-label { font-weight: bold; margin-left: 10px; color: #0056b3; }
         .filter-select {
-            padding: 8px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-            font-family: 'Tajawal', sans-serif;
-            font-size: 14px;
-            min-width: 200px;
-            cursor: pointer;
+            padding: 8px; border-radius: 5px; border: 1px solid #ccc;
+            font-family: 'Tajawal', sans-serif; font-size: 14px; min-width: 200px; cursor: pointer;
         }
 
-        /* الجدول */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -143,8 +135,21 @@
             background-color: #004494; color: white; z-index: 4;
         }
 
-        body.editing-mode .editable { border: 2px dashed #3498db; cursor: pointer; background-color: #f0f8ff; }
-        body.editing-mode th.editable-header { border: 2px dashed #f1c40f; cursor: pointer; background-color: #2980b9; }
+        /* تنسيق الخلايا القابلة للتعديل */
+        body.editing-mode .editable { 
+            border: 2px dashed #3498db; cursor: pointer; background-color: #f0f8ff; 
+        }
+        body.editing-mode th.editable-header { 
+            border: 2px dashed #f1c40f; cursor: pointer; background-color: #2980b9; 
+        }
+        
+        /* تنسيق الخلايا المغلقة (التي لا يملك المستخدم صلاحية عليها) */
+        body.editing-mode .locked-cell {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #eee;
+            border: none;
+        }
 
         .status-ok { color: #28a745; font-weight: bold; font-size: 18px; }
         .status-late { color: #dc3545; font-weight: bold; font-size: 18px; }
@@ -166,10 +171,7 @@
 
         .hospital-separator { border-bottom: 2px solid #666 !important; }
 
-        .legend {
-            display: flex; gap: 20px; font-size: 14px;
-            align-items: center;
-        }
+        .legend { display: flex; gap: 20px; font-size: 14px; align-items: center; }
 
         footer {
             margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;
@@ -177,6 +179,7 @@
         }
         
         #loader { text-align: center; padding: 20px; font-weight: bold; color: #0056b3; }
+        #roleDisplay { font-weight: bold; color: #f1c40f; margin-right: 10px; }
 
         @media print {
             @page { size: landscape; margin: 5mm; }
@@ -189,11 +192,12 @@
                 print-color-adjust: exact !important; 
             }
             .container { box-shadow: none; margin: 0; padding: 0; width: 100% !important; max-width: none !important; }
-            .admin-panel, .btn-print, #loginSection, .filter-section { display: none !important; } /* إخفاء الفلاتر عند الطباعة */
+            .admin-panel, .btn-print, #loginSection, .filter-section { display: none !important; }
             th, td { border: 1px solid #000 !important; font-size: 11px; padding: 4px !important; color: black !important; }
             .type-medical { background-color: #e3f2fd !important; }
             .type-non-medical { background-color: #fdebd0 !important; }
             a { text-decoration: none; color: black; }
+            .locked-cell { opacity: 1 !important; background: none !important; } /* إزالة تأثير القفل في الطباعة */
         }
     </style>
 </head>
@@ -203,21 +207,26 @@
     
     <div class="admin-panel">
         <div class="admin-header">
-            <div style="font-weight: bold;">🔒 بوابة المشرفين</div>
-            <button class="btn-print" onclick="window.print()">🖨 طباعة التقرير / PDF</button>
+            <div>
+                <span style="font-weight: bold;">🔒 بوابة المشرفين</span>
+                <span id="roleDisplay"></span>
+            </div>
+            <button class="btn-print" onclick="window.print()">🖨 طباعة التقرير</button>
         </div>
 
         <div id="loginSection">
-            <button class="btn-login" onclick="adminLogin()">تسجيل دخول (أدمن)</button>
+            <button class="btn-login" onclick="adminLogin()">تسجيل دخول</button>
         </div>
 
         <div id="adminControls" class="admin-controls">
-            <button class="btn-new-month" onclick="addNewMonthAutomatic()">📅 إضافة الشهر السابق (إقفال)</button>
+            <button class="btn-new-month super-admin-only" onclick="addNewMonthAutomatic()">📅 إضافة الشهر السابق (إقفال)</button>
+            <button class="btn-reset super-admin-only" onclick="uploadInitialData()">⚠ إعادة بناء الجدول (Reset)</button>
+            
             <button class="btn-save" onclick="saveToFirebase()">☁ حفظ التغييرات</button>
-            <button class="btn-reset" onclick="uploadInitialData()">⚠ إعادة بناء الجدول (Reset)</button>
             <button class="btn-logout" onclick="location.reload()">خروج</button>
+            
             <div style="width: 100%; font-size:12px; color:#bdc3c7; margin-top:5px;">
-                لكل مستشفى صفان مستقلان (طبي وغير طبي).
+                يمكنك التعديل فقط على الصفوف التي تملك صلاحية عليها (الخلايا المتاحة ستكون محاطة بإطار أزرق).
             </div>
         </div>
     </div>
@@ -233,7 +242,7 @@
     </header>
 
     <div class="filter-section">
-        <span class="filter-label">🌪 تصفية الجدول حسب نوع العقد:</span>
+        <span class="filter-label">🌪 تصفية الجدول:</span>
         <select id="typeFilter" class="filter-select" onchange="applyFilter()">
             <option value="all">عرض الكل (طبي + غير طبي)</option>
             <option value="طبي">عقود طبية فقط</option>
@@ -253,11 +262,9 @@
 
     <table id="mainTable" style="display:none;">
         <thead>
-            <tr id="headerRow">
-                </tr>
+            <tr id="headerRow"></tr>
         </thead>
-        <tbody id="tableBody">
-            </tbody>
+        <tbody id="tableBody"></tbody>
     </table>
 
     <footer>
@@ -283,8 +290,8 @@
     const db = getDatabase(app);
     
     window.currentData = { monthNames: [], rows: [] };
-    window.isAdmin = false;
-    window.currentFilter = 'all'; // الفلتر الافتراضي
+    window.userRole = null; // 'super', 'medical', 'non-medical'
+    window.currentFilter = 'all';
 
     const dataRef = ref(db, 'kpi_data_v4'); 
     onValue(dataRef, (snapshot) => {
@@ -294,7 +301,7 @@
         
         if (data && data.rows) {
             window.currentData = data;
-            renderTable(); // استخدام البيانات المخزنة والفلتر الحالي
+            renderTable();
             loader.style.display = 'none';
             table.style.display = 'table';
         } else {
@@ -303,13 +310,17 @@
     });
 
     window.saveToFirebase = function() {
-        if (!window.isAdmin) return;
+        if (!window.userRole) return;
         set(ref(db, 'kpi_data_v4'), window.currentData)
             .then(() => { alert("تم الحفظ بنجاح! ✅"); })
             .catch((error) => { alert("خطأ: " + error); });
     };
 
     window.uploadInitialData = function() {
+        if (!window.userRole || window.userRole !== 'super') {
+            alert("عذراً، هذه الصلاحية للمدير العام فقط.");
+            return;
+        }
         if(confirm("تحذير: إعادة بناء الجدول ببيانات افتراضية. هل أنت متأكد؟")) {
             const hospitals = [
                 "مستشفى ضبا العام", "مستشفى أملج العام", "مستشفى حقل العام", 
@@ -339,8 +350,10 @@
     };
 
     window.addNewMonthAutomatic = function() {
-        if (!window.isAdmin) return;
-        // نفس كود إضافة الشهر السابق
+        if (!window.userRole || window.userRole !== 'super') {
+            alert("عذراً، إضافة الشهور للمدير العام فقط.");
+            return;
+        }
         const date = new Date();
         date.setMonth(date.getMonth() - 1); 
         const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
@@ -369,20 +382,51 @@
 </script>
 
 <script>
+    // --- منطق الصلاحيات ---
     function adminLogin() {
-        const pass = prompt("الرجاء إدخال كلمة مرور المسؤول:");
-        if(pass === "1234") {
-            window.isAdmin = true;
-            document.body.classList.add('editing-mode');
-            document.getElementById('loginSection').style.display = 'none';
-            document.getElementById('adminControls').style.display = 'flex';
-            renderTable();
+        const pass = prompt("الرجاء إدخال كلمة المرور:");
+        
+        let roleName = "";
+        
+        if (pass === "1234") {
+            window.userRole = 'super';
+            roleName = "(مدير عام)";
+        } else if (pass === "1111") {
+            window.userRole = 'medical';
+            roleName = "(أدمن طبي)";
+        } else if (pass === "2222") {
+            window.userRole = 'non-medical';
+            roleName = "(أدمن غير طبي)";
         } else {
             alert("كلمة المرور خاطئة");
+            return;
         }
+
+        // تفعيل الواجهة
+        document.body.classList.add('editing-mode');
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('adminControls').style.display = 'flex';
+        document.getElementById('roleDisplay').innerText = roleName;
+
+        // إظهار/إخفاء الأزرار الخاصة بالسوبر أدمن
+        const superBtns = document.querySelectorAll('.super-admin-only');
+        superBtns.forEach(btn => {
+            btn.style.display = (window.userRole === 'super') ? 'inline-block' : 'none';
+        });
+
+        renderTable();
     }
 
-    // دالة لتطبيق الفلتر وتحديث الجدول
+    // دالة فحص الصلاحية للصف الواحد
+    function canEdit(rowType) {
+        if (!window.userRole) return false;
+        if (window.userRole === 'super') return true;
+        if (window.userRole === 'medical' && rowType === 'طبي') return true;
+        if (window.userRole === 'non-medical' && rowType === 'غير طبي') return true;
+        return false;
+    }
+
+    // --- منطق الجدول ---
     window.applyFilter = function() {
         window.currentFilter = document.getElementById('typeFilter').value;
         renderTable();
@@ -390,8 +434,8 @@
 
     function renderTable() {
         const data = window.currentData;
-        const filter = window.currentFilter; // 'all', 'طبي', 'غير طبي'
-
+        const filter = window.currentFilter;
+        
         const headerRow = document.getElementById('headerRow');
         headerRow.innerHTML = `
             <th style="min-width: 150px;">الموقع / المستشفى</th>
@@ -403,7 +447,9 @@
         if(data.monthNames) {
             data.monthNames.forEach((monthName, index) => {
                 let style = index === 0 ? "border-bottom: 3px solid #e74c3c;" : "";
-                headerRow.innerHTML += `<th class="editable-header" style="${style}" onclick="editHeader(${index})">${monthName}</th>`;
+                // السماح بتعديل العناوين فقط للسوبر أدمن
+                let headerClass = (window.userRole === 'super') ? "editable-header" : "";
+                headerRow.innerHTML += `<th class="${headerClass}" style="${style}" onclick="editHeader(${index})">${monthName}</th>`;
             });
         }
         headerRow.innerHTML += `<th style="min-width: 180px;">ملاحظات هامة</th>`;
@@ -412,27 +458,22 @@
         tbody.innerHTML = '';
 
         if(data.rows) {
-            // تصفية البيانات أولاً حسب الفلتر
-            let rowsToRender = data.rows; // الافتراضي الكل
-
-            // إذا اخترنا الكل، نستخدم منطق الدمج (RowSpan)
             if (filter === 'all') {
                 let i = 0;
-                while (i < rowsToRender.length) {
-                    let row = rowsToRender[i];
-                    let nextRow = rowsToRender[i+1];
+                while (i < data.rows.length) {
+                    let row = data.rows[i];
+                    let nextRow = data.rows[i+1];
                     let isSameHospital = (nextRow && row.name === nextRow.name);
                     
                     const tr1 = document.createElement('tr');
                     
-                    // دمج الاسم
                     if (isSameHospital) {
                         tr1.innerHTML += `<td rowspan="2" class="sticky-col-1" style="background-color: #fcfcfc;">${row.name}</td>`;
                     } else {
                         tr1.innerHTML += `<td class="sticky-col-1">${row.name}</td>`;
                     }
 
-                    appendRowData(tr1, row, i); // استخدام الفهرس الأصلي i
+                    appendRowData(tr1, row, i);
                     tbody.appendChild(tr1);
 
                     if (isSameHospital) {
@@ -446,12 +487,8 @@
                         i++;
                     }
                 }
-            } 
-            else {
-                // إذا تم اختيار فلتر (طبي أو غير طبي)، نعرض الصفوف بشكل مستقل بدون دمج
-                // لكن نحتاج نحافظ على الـ Index الأصلي عشان التعديل يتم صح
+            } else {
                 data.rows.forEach((row, originalIndex) => {
-                    // تحقق من الفلتر
                     if (row.type === filter) {
                         const tr = document.createElement('tr');
                         tr.innerHTML += `<td class="sticky-col-1">${row.name}</td>`;
@@ -465,29 +502,51 @@
     }
 
     function appendRowData(tr, row, rowIndex) {
+        // فحص الصلاحية لهذا الصف
+        const isEditable = canEdit(row.type);
+        const editClass = isEditable ? "editable" : "locked-cell"; // كلاس يحدد الشكل
+        const clickAttr = isEditable ? `onclick` : `data-disabled`; // تعطيل النقر إذا لم يملك صلاحية
+
         let typeClass = row.type === "طبي" ? "type-medical" : "type-non-medical";
         tr.innerHTML += `<td class="sticky-col-2 ${typeClass}">${row.type}</td>`;
-        tr.innerHTML += `<td class="sticky-col-3 editable" onclick="editCell(${rowIndex}, 'cont')">${row.cont}</td>`;
         
+        // المقاول
+        if (isEditable) {
+            tr.innerHTML += `<td class="sticky-col-3 ${editClass}" onclick="editCell(${rowIndex}, 'cont')">${row.cont}</td>`;
+        } else {
+            tr.innerHTML += `<td class="sticky-col-3 ${editClass}">${row.cont}</td>`;
+        }
+        
+        // المتأخرة
         let autoLateCount = row.months.filter(m => m.includes('✘')).length;
         row.late = autoLateCount;
         let badgeClass = row.late > 0 ? 'badge-red' : 'badge-green';
         tr.innerHTML += `<td><span class="badge ${badgeClass}">${row.late}</span></td>`;
 
+        // الشهور
         row.months.forEach((status, monthIndex) => {
             let statusClass = status.includes('✔') ? 'status-ok' : 'status-late';
-            tr.innerHTML += `<td class="editable ${statusClass}" 
-                                 ondblclick="toggleStatus(${rowIndex}, ${monthIndex})"
-                                 onclick="editMonthText(${rowIndex}, ${monthIndex})">
-                                 ${status}
-                             </td>`;
+            if (isEditable) {
+                tr.innerHTML += `<td class="${editClass} ${statusClass}" 
+                                     ondblclick="toggleStatus(${rowIndex}, ${monthIndex})"
+                                     onclick="editMonthText(${rowIndex}, ${monthIndex})">
+                                     ${status}
+                                 </td>`;
+            } else {
+                tr.innerHTML += `<td class="${editClass} ${statusClass}">${status}</td>`;
+            }
         });
 
-        tr.innerHTML += `<td class="editable note-text" onclick="editCell(${rowIndex}, 'notes')">${row.notes}</td>`;
+        // الملاحظات
+        if (isEditable) {
+            tr.innerHTML += `<td class="${editClass} note-text" onclick="editCell(${rowIndex}, 'notes')">${row.notes}</td>`;
+        } else {
+            tr.innerHTML += `<td class="${editClass} note-text">${row.notes}</td>`;
+        }
     }
 
     window.editHeader = function(index) {
-        if (!window.isAdmin) return;
+        if (!window.userRole || window.userRole !== 'super') return;
         let oldVal = window.currentData.monthNames[index];
         let newVal = prompt("تعديل اسم الشهر:", oldVal);
         if (newVal !== null) {
@@ -497,7 +556,9 @@
     };
 
     window.editCell = function(rowIndex, field) {
-        if (!window.isAdmin) return;
+        let rowType = window.currentData.rows[rowIndex].type;
+        if (!canEdit(rowType)) return; // منع التعديل
+        
         let oldVal = window.currentData.rows[rowIndex][field];
         let newVal = prompt("تعديل القيمة:", oldVal);
         if (newVal !== null) {
@@ -509,7 +570,9 @@
     window.editMonthText = function(rowIndex, monthIndex) { }
 
     window.toggleStatus = function(rowIndex, monthIndex) {
-        if (!window.isAdmin) return;
+        let rowType = window.currentData.rows[rowIndex].type;
+        if (!canEdit(rowType)) return; // منع التعديل
+        
         let currentStatus = window.currentData.rows[rowIndex].months[monthIndex];
         if (currentStatus.includes('✔')) {
             window.currentData.rows[rowIndex].months[monthIndex] = '✘';
