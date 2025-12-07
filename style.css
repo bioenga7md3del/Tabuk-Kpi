@@ -142,3 +142,22 @@ tr.row-non-medical td.sticky-col-1, tr.row-non-medical td.sticky-col-3 { backgro
     .tooltip-text { display: none !important; }
     @page { size: landscape; margin: 5mm; }
 }
+/* --- تصميم التلميح العائم الجديد --- */
+#global-tooltip {
+    position: fixed; /* يظهر فوق كل شيء */
+    background: rgba(44, 62, 80, 0.95); /* لون كحلي غامق شفاف قليلاً */
+    color: #fff;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: normal;
+    line-height: 1.6;
+    white-space: pre-line; /* يحافظ على الأسطر */
+    z-index: 9999; /* أعلى طبقة */
+    pointer-events: none; /* يسمح للماوس بالمرور خلاله */
+    display: none; /* مخفي افتراضياً */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.1);
+    text-align: right;
+    min-width: 200px;
+}
