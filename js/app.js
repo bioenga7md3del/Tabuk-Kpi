@@ -10,47 +10,38 @@ window.appPasswords = { super: '1234', medical: '1111', non_medical: '2222' };
 // --- 1. تهيئة التطبيق ---
 UI.initTooltip();
 
-// استماع للبيانات
 DB.listenToData((data) => {
-    // إخفاء اللودر
     document.getElementById('loader').style.display = 'none';
-    
     if (data) {
         window.appData.contractors = data.contractors || {};
         window.appData.contracts = data.contracts || {};
         window.appData.monthNames = data.monthNames || [];
-    } else {
-        window.appData = { contractors: {}, contracts: {}, monthNames: [] };
     }
-    
-    // رسم الواجهة (دائماً)
+    // تحديث الواجهة دائماً (حتى لو فارغة)
     try {
         refreshView();
         document.getElementById('mainTable').style.display = 'table';
     } catch (e) { console.error("Error rendering:", e); }
-
 }, (err) => {
-    document.getElementById('loader').innerText = "خطأ اتصال";
     console.error(err);
 });
 
-// استماع للباسورد
 DB.listenToPasswords((pass) => window.appPasswords = pass);
 
-// --- 2. دوال مساعدة ---
+// --- 2. Refresh Helper ---
 function refreshView() {
     const rows = UI.renderTable(window.appData, window.userRole, Auth.canEdit);
     UI.updateStats(rows, window.appData);
     
+    // تحديث الكروت فقط للأدمن
     if (window.userRole && window.userRole !== 'viewer') {
         UI.renderCards(window.appData, 'contract');
         UI.renderCards(window.appData, 'contractor');
     }
 }
 
-// --- 3. تعريف الدوال العامة (Global Functions) للـ HTML ---
+// --- 3. Global Window Functions (HTML Hooks) ---
 
-// Login
 window.adminLogin = async function() {
     const { value: pass } = await Swal.fire({ title: 'تسجيل الدخول', input: 'password', confirmButtonText: 'دخول' });
     if (!pass) return;
@@ -60,17 +51,15 @@ window.adminLogin = async function() {
     
     window.userRole = result.role;
     
-    // UI Updates for Login
     document.getElementById('loginSection').classList.add('hidden');
     document.getElementById('dashboardControls').classList.remove('hidden');
     document.getElementById('loginBtn').classList.add('hidden');
     document.getElementById('logoutBtn').classList.remove('hidden');
     document.getElementById('roleDisplay').innerText = result.name;
     
-    // Show/Hide Elements based on Role
+    // إخفاء/إظهار حسب الصلاحية
     const isSuper = window.userRole === 'super';
     const isViewer = window.userRole === 'viewer';
-    
     document.querySelectorAll('.super-admin-only').forEach(el => el.style.display = isSuper ? 'inline-block' : 'none');
     document.querySelectorAll('.restricted-tab').forEach(el => el.style.display = isViewer ? 'none' : 'block');
     
@@ -78,7 +67,6 @@ window.adminLogin = async function() {
     UI.showToast(`مرحباً: ${result.name}`);
 };
 
-// Navigation
 window.switchView = function(viewId) {
     document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -89,34 +77,34 @@ window.switchView = function(viewId) {
     if(navs[map[viewId]]) navs[map[viewId]].classList.add('active');
 };
 
-// Tooltip Proxy
+// Tooltip proxies
 window.showTooltip = UI.showTooltip;
 window.hideTooltip = UI.hideTooltip;
-window.renderTable = refreshView; // For search input event
+window.renderTable = refreshView;
 
-// Contract CRUD
+// --- CRUD ---
 window.saveContract = function() {
     const id = document.getElementById('form-contract-id').value;
     const data = {
-        hospital: document.getElementById('form-hospital').value,
+        contractName: document.getElementById('form-contract-name').value, // الاسم الجديد
+        hospital: document.getElementById('form-hospital').value, // Legacy
         type: document.getElementById('form-type').value,
         contractorId: document.getElementById('form-contractor').value,
         startDate: document.getElementById('form-start-date').value,
         endDate: document.getElementById('form-end-date').value,
+        duration: document.getElementById('form-duration').value,
         value: document.getElementById('form-value').value,
         contractNumber: document.getElementById('form-contract-num').value
     };
     
-    if(!data.hospital || !data.contractorId) return Swal.fire('تنبيه', 'بيانات ناقصة', 'error');
+    if(!data.contractName || !data.contractorId) return Swal.fire('تنبيه', 'بيانات ناقصة', 'error');
 
     if(id) {
-        // Edit: preserve existing
         const old = window.appData.contracts[id];
         data.months = old.months || []; data.notes = old.notes || "";
         DB.updateContract(id, data).then(() => { UI.showToast("تم التعديل"); UI.toggleModal('contractModal', false); });
     } else {
-        // New
-        const count = window.appData.monthNames.length;
+        const count = window.appData.monthNames ? window.appData.monthNames.length : 0;
         data.months = Array(count).fill().map(() => ({status:"late", financeStatus:"late"}));
         data.notes = "";
         DB.addContract(data).then(() => { UI.showToast("تم الحفظ"); UI.toggleModal('contractModal', false); });
@@ -131,17 +119,19 @@ window.prepareEditContract = function(id) {
     const c = window.appData.contracts[id];
     fillSelect();
     document.getElementById('form-contract-id').value = id;
-    document.getElementById('form-hospital').value = c.hospital;
+    // دعم الاسم الجديد والقديم
+    document.getElementById('form-contract-name').value = c.contractName || c.hospital;
+    document.getElementById('form-hospital').value = c.hospital; // Hidden legacy
     document.getElementById('form-type').value = c.type;
     document.getElementById('form-contractor').value = c.contractorId;
     document.getElementById('form-start-date').value = c.startDate;
     document.getElementById('form-end-date').value = c.endDate;
+    document.getElementById('form-duration').value = c.duration || '';
     document.getElementById('form-value').value = c.value;
     document.getElementById('form-contract-num').value = c.contractNumber;
     UI.toggleModal('contractModal', true);
 };
 
-// Contractor CRUD
 window.saveContractor = function() {
     const id = document.getElementById('form-contractor-id').value;
     const name = document.getElementById('form-new-contractor').value;
@@ -162,7 +152,6 @@ window.prepareEditContractor = function(id, name) {
     UI.toggleModal('contractorModal', true);
 };
 
-// Workflow
 window.handleKpiCell = async function(cid, midx) {
     if (!Auth.canEdit(window.userRole, window.appData.contracts[cid].type)) return;
     const c = window.appData.contracts[cid];
@@ -176,9 +165,8 @@ window.handleKpiCell = async function(cid, midx) {
     });
     
     if(v) DB.updateMonthStatus(cid, midx, v).then(() => {
-        window.appData.contracts[cid].months[midx] = v; // تحديث محلي
-        refreshView(); 
-        UI.showToast("تم");
+        window.appData.contracts[cid].months[midx] = v; 
+        refreshView(); UI.showToast("تم");
     });
 };
 
@@ -188,11 +176,10 @@ window.editNote = async function(cid) {
     if(t!==undefined) DB.updateContract(cid, {notes:t});
 };
 
-// System
+// --- System ---
 window.refreshMonthsSystem = async function() {
     if(!window.userRole) return;
     if(!(await Swal.fire({title:'تحديث؟', icon:'warning', showCancelButton:true})).isConfirmed) return;
-    
     const now = new Date();
     const arM = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
     let mNames = [];
@@ -200,7 +187,6 @@ window.refreshMonthsSystem = async function() {
     mNames.reverse();
     
     DB.updateMonthsList(mNames);
-    // تحديث كل العقود
     Object.entries(window.appData.contracts).forEach(([id, c]) => {
         const adj = new Array(mNames.length).fill(null).map((_,i) => (c.months||[])[i] || {status:"late", financeStatus:"late"});
         DB.updateContractMonths(id, adj);
@@ -216,6 +202,16 @@ window.systemReset = async function() {
     }
 };
 
+window.changePasswords = async function() {
+    if (!window.userRole || window.userRole !== 'super') return;
+    const { value: f } = await Swal.fire({
+        title: 'تغيير كلمات المرور',
+        html: '<input id="p1" class="swal2-input" value="'+window.appPasswords.super+'"><input id="p2" class="swal2-input" value="'+window.appPasswords.medical+'"><input id="p3" class="swal2-input" value="'+window.appPasswords.non_medical+'">',
+        preConfirm: () => ({ super: document.getElementById('p1').value, medical: document.getElementById('p2').value, non_medical: document.getElementById('p3').value })
+    });
+    if (f) DB.savePasswords(f).then(() => { window.appPasswords = f; UI.showToast('تم الحفظ'); });
+}
+
 window.exportToExcel = function() {
     const ws = XLSX.utils.table_to_sheet(document.getElementById('mainTable'));
     const wb = XLSX.utils.book_new();
@@ -223,14 +219,13 @@ window.exportToExcel = function() {
     XLSX.writeFile(wb, "KPI_Report.xlsx");
 };
 
-// Helpers
+// --- Helpers ---
 window.openModal = function(id) {
     UI.toggleModal(id, true);
     if(id==='contractModal') fillSelect();
-    // Clear forms logic...
     if(id==='contractorModal' && !document.getElementById('form-contractor-id').value) document.getElementById('form-new-contractor').value='';
     if(id==='contractModal' && !document.getElementById('form-contract-id').value) {
-        document.getElementById('form-hospital').value=''; document.getElementById('form-contract-num').value='';
+        document.getElementById('form-contract-name').value=''; document.getElementById('form-contract-num').value='';
     }
 };
 window.closeModal = function(id) {
@@ -238,7 +233,6 @@ window.closeModal = function(id) {
     if(id==='contractModal') document.getElementById('form-contract-id').value='';
     if(id==='contractorModal') document.getElementById('form-contractor-id').value='';
 };
-
 function fillSelect() {
     const s = document.getElementById('form-contractor');
     const curr = s.value;
