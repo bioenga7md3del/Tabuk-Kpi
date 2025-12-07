@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نظام إدارة عقود الصيانة</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -46,10 +47,10 @@
         <div id="loginSection" style="text-align:center; margin:20px 0; color:#777;">يرجى تسجيل الدخول للتحكم</div>
 
         <div class="stats-grid">
-            <div class="stat-card"><span class="stat-number" id="countContracts">0</span><span class="stat-label">إجمالي العقود</span></div>
-            <div class="stat-card"><span class="stat-number" id="countActive" style="color:var(--success)">0</span><span class="stat-label">عقود سارية</span></div>
-            <div class="stat-card"><span class="stat-number" id="countExpired" style="color:var(--danger)">0</span><span class="stat-label">عقود منتهية</span></div>
-            <div class="stat-card"><span class="stat-number" id="countLate" style="color:var(--danger)">0</span><span class="stat-label">متأخرات مالية</span></div>
+            <div class="stat-card"><span class="stat-number" id="countContracts">0</span><span class="stat-label">العقود</span></div>
+            <div class="stat-card"><span class="stat-number" id="countActive" style="color:var(--success)">0</span><span class="stat-label">ساري</span></div>
+            <div class="stat-card"><span class="stat-number" id="countExpired" style="color:var(--danger)">0</span><span class="stat-label">منتهي</span></div>
+            <div class="stat-card"><span class="stat-number" id="countLate" style="color:var(--danger)">0</span><span class="stat-label">متأخرات</span></div>
             <div class="stat-card" style="border-right-color:var(--success)"><span class="stat-number" id="complianceRate" style="color:var(--success)">0%</span><span class="stat-label">الالتزام</span></div>
         </div>
 
@@ -97,7 +98,8 @@
         <div class="modal-header"><h3>بيانات العقد</h3><button class="close-btn" onclick="closeModal('contractModal')">&times;</button></div>
         <div class="modal-body">
             <input type="hidden" id="form-contract-id">
-            <div class="form-group"><label>اسم العقد <span style="color:red">*</span></label><input type="text" id="form-contract-name" class="form-control" placeholder="مثال: عقد نظافة - مستشفى الملك فهد"></div>
+            
+            <div class="form-group"><label>اسم العقد / الموقع <span style="color:red">*</span></label><input type="text" id="form-contract-name" class="form-control" placeholder="مثال: عقد صيانة مستشفى..."></div>
             
             <div style="display:flex; gap:10px;">
                 <div class="form-group" style="flex:1"><label>النوع</label><select id="form-type" class="form-control"><option value="طبي">طبي</option><option value="غير طبي">غير طبي</option></select></div>
@@ -110,7 +112,7 @@
             </div>
             
             <div style="display:flex; gap:10px;">
-                <div class="form-group" style="flex:1"><label>مدة العقد</label><input type="text" id="form-duration" class="form-control" placeholder="مثال: 3 سنوات"></div>
+                <div class="form-group" style="flex:1"><label>المدة (نص)</label><input type="text" id="form-duration" class="form-control" placeholder="مثال: 3 سنوات"></div>
                 <div class="form-group" style="flex:1"><label>القيمة</label><input type="number" id="form-value" class="form-control"></div>
             </div>
             
