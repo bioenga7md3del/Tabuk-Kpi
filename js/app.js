@@ -25,7 +25,7 @@ onValue(dbRef, (snapshot) => {
         try {
             // تحديث العرض إذا كان هناك مستخدم مسجل أو للعرض العام
             renderTable();
-            updateStats();
+            updateStats(); // تم تأمين هذه الدالة بالأسفل
             
             // تحديث كروت الإدارة فقط إذا لم يكن زائراً
             if (window.userRole && window.userRole !== 'viewer') {
@@ -53,11 +53,21 @@ onValue(ref(db, 'app_settings/passwords'), (s) => {
 });
 
 // --- 2. دوال التلميح العائم (Floating Tooltip Logic) ---
-// التأكد من وجود عنصر التلميح في الصفحة
 document.addEventListener("DOMContentLoaded", () => {
     if (!document.getElementById('global-tooltip')) {
         const div = document.createElement('div');
         div.id = 'global-tooltip';
+        div.style.position = 'fixed';
+        div.style.background = 'rgba(44, 62, 80, 0.95)';
+        div.style.color = '#fff';
+        div.style.padding = '10px 15px';
+        div.style.borderRadius = '8px';
+        div.style.fontSize = '12px';
+        div.style.zIndex = '9999';
+        div.style.pointerEvents = 'none';
+        div.style.display = 'none';
+        div.style.boxShadow = '0 4px 15px rgba(0,0,0,0.3)';
+        div.style.whiteSpace = 'pre-line';
         document.body.appendChild(div);
     }
 });
@@ -69,15 +79,12 @@ window.showTooltip = function(e, element) {
     if (tooltip && text) {
         tooltip.innerText = text;
         tooltip.style.display = 'block';
-        // تحريك التلميح مع الماوس
         let top = e.clientY + 15;
         let left = e.clientX + 15;
 
-        // منع الخروج عن الشاشة يميناً
         if (left + 220 > window.innerWidth) {
             left = e.clientX - 225;
         }
-        // منع الخروج أسفل الشاشة
         if (top + 100 > window.innerHeight) {
             top = e.clientY - 100;
         }
@@ -97,7 +104,8 @@ window.switchView = function(viewId) {
     document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     
-    document.getElementById(viewId).classList.add('active');
+    const target = document.getElementById(viewId);
+    if(target) target.classList.add('active');
     
     const navMap = { 'dashboard-view': 0, 'contracts-view': 1, 'contractors-view': 2 };
     const navItems = document.querySelectorAll('.nav-item');
@@ -172,7 +180,6 @@ window.renderTable = function() {
             let valFmt = '-';
             if(row.value) valFmt = Number(row.value).toLocaleString();
             
-            // بيانات التلميح (Tooltip Data)
             const tipData = `📄 رقم العقد: ${row.contractNumber || '-'}
 💰 القيمة: ${valFmt} ريال
 📅 البداية: ${row.startDate || '-'}
@@ -180,7 +187,6 @@ window.renderTable = function() {
 
             tr.innerHTML = `
                 <td class="sticky-col-1">${hospName}</td>
-                
                 <td class="sticky-col-2" 
                     data-tip="${tipData}"
                     onmousemove="showTooltip(event, this)" 
@@ -188,7 +194,6 @@ window.renderTable = function() {
                     style="cursor: help;">
                     <span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span>
                 </td>
-                
                 <td class="sticky-col-3">${cName}</td>
                 <td><span class="badge ${badge}">${late}</span></td>
             `;
@@ -207,7 +212,6 @@ window.renderTable = function() {
                         ti=`إعادة للموقع!\nالسبب: ${md.returnNotes||'-'}`; 
                     }
                     
-                    // استخدام التلميح العائم أيضاً للخلايا لتجنب القص
                     tr.innerHTML += `<td class="${cl}" style="${canEdit(row.type)?'cursor:pointer':''}">
                         <div data-tip="${ti}" 
                              onmousemove="showTooltip(event, this)" 
@@ -222,11 +226,13 @@ window.renderTable = function() {
             }
 
             const en = canEdit(row.type) ? `onclick="editNote('${row.id}')"` : '';
-            tr.innerHTML += `<td ${en} style="cursor:pointer; font-size:11px;">${row.notes||''}</td>`;
+            const noteCursor = canEdit(row.type) ? "cursor:pointer" : "cursor:default";
+            tr.innerHTML += `<td ${en} style="${noteCursor}; font-size:11px;">${row.notes||''}</td>`;
             tbody.appendChild(tr);
         }
     });
     
+    // تمرير الصفوف المفلترة لتحديث الإحصائيات بناءً عليها
     updateDashboard(rowsArr.filter(row => {
         const cName = (contractors[row.contractorId]?.name) || "";
         return row.hospital.toLowerCase().includes(searchHosp) && 
@@ -235,7 +241,7 @@ window.renderTable = function() {
     }));
 };
 
-// --- 5. لوحة الإحصائيات ---
+// --- 5. لوحة الإحصائيات (تحديث آمن) ---
 function updateDashboard(rows) {
     if(!rows) return;
     
@@ -248,6 +254,7 @@ function updateDashboard(rows) {
     
     const compliance = totalCells > 0 ? Math.round((totalSubmitted / totalCells) * 100) : 0;
 
+    // Safety Checks: Only update if element exists
     const elHosp = document.getElementById('countHospitals'); if(elHosp) elHosp.innerText = uniqueHospitals;
     const elCont = document.getElementById('countContracts'); if(elCont) elCont.innerText = rows.length;
     const elLate = document.getElementById('countLate'); if(elLate) elLate.innerText = totalLate;
@@ -267,6 +274,16 @@ function updateDashboard(rows) {
         });
     }
 }
+
+// دالة updateStats العامة للنداء من أماكن أخرى بأمان
+window.updateStats = function() {
+    // نستخدم نفس المنطق الموجود في updateDashboard ولكن على كل البيانات إذا لم يتم تمرير صفوف محددة
+    if (window.appData && window.appData.contracts) {
+        const allRows = Object.values(window.appData.contracts);
+        updateDashboard(allRows);
+    }
+};
+
 
 // --- 6. تسجيل الدخول ---
 window.adminLogin = async function() {
@@ -296,7 +313,6 @@ window.adminLogin = async function() {
     
     if(document.getElementById('roleDisplay')) document.getElementById('roleDisplay').innerText = roleName;
 
-    // إخفاء/إظهار العناصر
     if (window.userRole === 'viewer') {
         document.querySelectorAll('.super-admin-only').forEach(b => b.style.display = 'none');
         document.querySelectorAll('.restricted-tab').forEach(t => t.style.display = 'none');
@@ -350,6 +366,7 @@ window.saveContract = function() {
     const hosp = document.getElementById('form-hospital').value;
     const contId = document.getElementById('form-contractor').value;
     const type = document.getElementById('form-type').value;
+    
     if(!hosp || !contId) { Swal.fire('نقص بيانات','المستشفى والمقاول مطلوبان','error'); return; }
 
     const data = {
@@ -433,6 +450,7 @@ window.handleKpiCell = async function(cid, midx) {
             <input id="sw-cn" class="form-control" placeholder="رقم المطالبة" value="${m.claimNum||''}" style="margin-top:5px;">
             <input id="sw-ln" class="form-control" placeholder="رقم الخطاب" value="${m.letterNum||''}" style="margin-top:5px;">
             <input id="sw-dt" class="form-control" type="date" value="${m.submissionDate||''}" style="margin-top:5px;">
+            
             <div id="note-area" style="display:${curStatus==='returned'?'block':'none'}; margin-top:5px;">
                 <input id="sw-nt" class="form-control" placeholder="سبب الإعادة/ملاحظات" value="${m.returnNotes||''}">
             </div>
