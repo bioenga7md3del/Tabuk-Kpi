@@ -15,6 +15,7 @@
             --text-color: #333;
             --success: #28a745;
             --danger: #dc3545;
+            --border-color: #e0e0e0;
         }
 
         body {
@@ -48,7 +49,7 @@
         .header-text h2 { color: #666; margin: 5px 0 0 0; font-size: 16px; }
         .logo-container img { max-height: 110px; width: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
 
-        /* --- لوحة الإحصائيات (الجديدة) --- */
+        /* --- لوحة الإحصائيات --- */
         .stats-dashboard {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -114,56 +115,103 @@
             background-color: #fcfcfc;
         }
 
-        /* --- الجدول --- */
+        /* --- الجدول (تصحيح التداخل) --- */
         table {
-            width: 100%; border-collapse: separate; border-spacing: 0;
-            min-width: 1300px; border: 1px solid #eee; border-radius: 8px; overflow: hidden;
+            width: 100%;
+            /* استخدام separate بدلاً من collapse يحل مشكلة اختفاء الحدود والتداخل */
+            border-collapse: separate; 
+            border-spacing: 0;
+            min-width: 1400px; /* زيادة العرض لضمان عدم انضغاط الأعمدة */
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
         }
 
         thead th {
-            background-color: var(--primary-color); color: white; padding: 12px 8px;
-            font-size: 14px; border-bottom: 2px solid #004085;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 10px;
+            font-size: 14px;
+            /* حدود يدوية للرأس */
+            border-bottom: 1px solid #004085;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 10; /* أعلى طبقة */
         }
 
         td {
-            padding: 10px 6px; text-align: center; border-bottom: 1px solid #eee; border-right: 1px solid #f5f5f5;
-            font-size: 14px; vertical-align: middle; transition: background 0.2s;
+            padding: 12px 8px;
+            text-align: center;
+            font-size: 14px;
+            vertical-align: middle;
+            background-color: #fff;
+            /* حدود يدوية للخلايا */
+            border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            transition: background 0.2s;
+        }
+
+        tr:last-child td { border-bottom: none; }
+        
+        /* --- تثبيت الأعمدة (Fixed Columns) --- */
+        /* العمود 1: المستشفى */
+        .sticky-col-1 {
+            position: sticky;
+            right: 0;
+            background-color: #f8f9fa !important; /* لون ثابت */
+            z-index: 5;
+            font-weight: bold;
+            border-left: 2px solid var(--border-color);
+            min-width: 180px;
+        }
+
+        /* العمود 2: النوع */
+        .sticky-col-2 {
+            position: sticky;
+            right: 180px; /* يجب أن يساوي عرض العمود 1 */
+            background-color: #fff !important;
+            z-index: 4;
+            min-width: 90px;
+            border-left: 1px solid var(--border-color);
+        }
+
+        /* العمود 3: المقاول (الذي كان يسبب المشكلة) */
+        .sticky-col-3 {
+            position: sticky;
+            right: 270px; /* مجموع عرض العمود 1 + 2 */
+            background-color: #f8f9fa !important;
+            z-index: 5; /* أعلى من الخلايا العادية */
+            min-width: 160px;
+            /* الظل هو الحل السحري للفصل البصري */
+            box-shadow: -5px 0 10px -5px rgba(0,0,0,0.15); 
+            border-left: 1px solid #ccc;
         }
         
-        tr:hover td:not(.sticky-col-1):not(.sticky-col-2) { background-color: #f8f9fa; }
+        /* تثبيت رؤوس الجدول للأعمدة المثبتة */
+        thead th:nth-child(1) { right: 0; z-index: 11; min-width: 180px; }
+        thead th:nth-child(2) { right: 180px; z-index: 11; min-width: 90px; }
+        thead th:nth-child(3) { right: 270px; z-index: 11; min-width: 160px; box-shadow: -5px 0 10px -5px rgba(0,0,0,0.3); }
 
-        /* تثبيت الأعمدة */
-        .sticky-col-1 { position: sticky; right: 0; background-color: #fdfdfd; z-index: 3; font-weight: bold; border-left: 2px solid #e1e4e8; }
-        .sticky-col-2 { position: sticky; right: 150px; background-color: #fff; z-index: 2; border-left: 1px solid #ddd; }
-        .sticky-col-3 { position: sticky; right: 230px; background-color: #fdfdfd; z-index: 2; border-left: 3px solid #ccc; }
-        
-        thead th:nth-child(1), thead th:nth-child(2), thead th:nth-child(3) { z-index: 4; }
 
         /* الحالات */
-        .status-ok { color: var(--success); font-size: 18px; }
-        .status-late { color: #e74c3c; font-size: 18px; transform: scale(1.1); }
-        .status-detailed { color: var(--primary-color); font-size: 18px; cursor: help; }
+        .status-ok { color: var(--success); font-size: 20px; }
+        .status-late { color: #e74c3c; font-size: 20px; }
+        .status-detailed { color: var(--primary-color); font-size: 20px; cursor: help; }
 
-        /* الشارات (Badges) */
-        .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        /* الشارات */
+        .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; color: white; }
         .badge-red { background-color: var(--danger); }
         .badge-green { background-color: var(--success); }
 
         /* أنواع العقود */
-        .type-medical { color: var(--primary-color); font-weight: 700; background-color: #eaf4ff; border-radius: 4px; }
-        .type-non-medical { color: #d35400; font-weight: 700; background-color: #fff4e6; border-radius: 4px; }
+        .type-medical { color: var(--primary-color); font-weight: 700; background-color: #eaf4ff !important; }
+        .type-non-medical { color: #d35400; font-weight: 700; background-color: #fff4e6 !important; }
 
-        /* فواصل الجدول */
-        .hospital-separator { border-bottom: 2px solid #b0b0b0 !important; }
+        .hospital-separator { border-bottom: 2px solid #999 !important; }
 
         /* --- تأثيرات التعديل --- */
-        body.editing-mode .editable { 
-            cursor: pointer; position: relative;
-        }
-        body.editing-mode .editable:hover::after {
-            content: '✎'; position: absolute; top: 0; left: 2px; font-size: 10px; color: #999;
-        }
-        body.editing-mode .locked-cell { opacity: 0.6; cursor: not-allowed; background-color: #f0f0f0; }
+        body.editing-mode .editable:hover { background-color: #f1f8ff; cursor: pointer; }
+        body.editing-mode .locked-cell { opacity: 0.6; cursor: not-allowed; background-color: #f0f0f0 !important; }
 
         /* --- إشعار الحفظ --- */
         #toast {
@@ -177,10 +225,12 @@
         /* --- الطباعة --- */
         @media print {
             @page { size: landscape; margin: 5mm; }
-            body { background: white; transform: scale(0.75); transform-origin: top right; width: 133%; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            body { background: white; transform: scale(0.65); transform-origin: top right; width: 150%; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .container { box-shadow: none; padding: 0; width: 100% !important; max-width: none !important; }
             .admin-panel, .btn-print, #loginSection, .filter-section, #toast, .stats-dashboard { display: none !important; }
-            th, td { border: 1px solid #000 !important; font-size: 11px; padding: 4px !important; color: black !important; }
+            th, td { border: 1px solid #000 !important; font-size: 10px; padding: 2px !important; color: black !important; }
+            /* إجبار الخلفيات في الطباعة */
+            .sticky-col-1, .sticky-col-2, .sticky-col-3 { position: static !important; box-shadow: none !important; border: 1px solid #000 !important; }
             .type-medical { background-color: #e3f2fd !important; }
             .type-non-medical { background-color: #fdebd0 !important; }
             td[title]:after { content: attr(title); display: block; font-size: 8px; color: #333; margin-top: 2px; white-space: pre-wrap; }
@@ -300,7 +350,7 @@
         const table = document.getElementById('mainTable');
         
         if (data && data.rows) {
-            // تنظيف البيانات القديمة
+            // تنظيف البيانات
             data.rows.forEach(row => {
                 if (row.months && row.months.length > 0 && typeof row.months[0] === 'string') {
                     row.months = row.months.map(s => ({ status: s, letterNum: "", submissionDate: "" }));
@@ -332,23 +382,16 @@
             .catch((error) => { showToast("فشل الحفظ ❌", false); });
     };
 
-    // --- تحديث لوحة الإحصائيات ---
     function updateDashboard() {
         if(!window.currentData.rows) return;
-        
-        // حساب عدد المستشفيات (الفريدة)
         const uniqueHospitals = new Set(window.currentData.rows.map(r => r.name)).size;
         document.getElementById('totalHospitals').innerText = uniqueHospitals;
-
-        // حساب عدد العقود الكلي
         document.getElementById('totalContracts').innerText = window.currentData.rows.length;
-
-        // حساب إجمالي المتأخرات (مجموع عمود المتأخرة)
         const totalLate = window.currentData.rows.reduce((sum, row) => sum + (row.late || 0), 0);
         document.getElementById('totalLate').innerText = totalLate;
     }
 
-    // --- الوظائف الإدارية (مع SweetAlert2) ---
+    // --- الوظائف الإدارية ---
     window.adminLogin = async function() {
         const { value: pass } = await Swal.fire({
             title: 'تسجيل الدخول',
@@ -408,14 +451,12 @@
                 "مستشفى أبوراكة العام", "مستشفى الملك فهد", "مستشفى الصحة النفسية", 
                 "مستشفى الملك خالد", "مستشفى الولادة والأطفال", "مستشفى الوجه"
             ];
-            
             const initialMonths = Array(12).fill().map(() => ({ status: "✔", letterNum: "", submissionDate: "" }));
             let newRows = [];
             hospitals.forEach(hosp => {
                 newRows.push({ name: hosp, type: "طبي", cont: "اسم المقاول", late: 0, months: JSON.parse(JSON.stringify(initialMonths)), notes: "" });
                 newRows.push({ name: hosp, type: "غير طبي", cont: "اسم المقاول", late: 0, months: JSON.parse(JSON.stringify(initialMonths)), notes: "" });
             });
-
             const initialData = {
                 monthNames: [
                     "أكتوبر 25", "سبتمبر 25", "أغسطس 25", "يوليو 25", 
@@ -424,7 +465,6 @@
                 ],
                 rows: newRows
             };
-            
             window.currentData = initialData;
             window.saveToFirebase();
         }
@@ -458,18 +498,15 @@
             window.currentData.rows.forEach(row => { 
                 row.months.unshift(JSON.parse(JSON.stringify(emptyMonthData)));
             });
-
             if (window.currentData.monthNames.length > 12) {
                 window.currentData.monthNames.pop();
                 window.currentData.rows.forEach(row => { row.months.pop(); });
             }
-
             renderTable();
             window.saveToFirebase();
         }
     };
 
-    // --- منطق الجدول ---
     function canEdit(rowType) {
         if (!window.userRole) return false;
         if (window.userRole === 'super') return true;
@@ -489,9 +526,9 @@
         
         const headerRow = document.getElementById('headerRow');
         headerRow.innerHTML = `
-            <th style="min-width: 150px;">الموقع / المستشفى</th>
-            <th style="min-width: 80px;">نوع العقد</th>
-            <th style="min-width: 140px;">المقاول</th>
+            <th style="min-width: 180px;">الموقع / المستشفى</th>
+            <th style="min-width: 90px;">نوع العقد</th>
+            <th style="min-width: 160px;">المقاول</th>
             <th style="width: 50px;">المتأخرة</th>
         `;
 
@@ -580,14 +617,12 @@
         tr.innerHTML += `<td class="${editClass} note-text" ${isEditable ? `onclick="editCell(${rowIndex}, 'notes')"` : ''}>${row.notes}</td>`;
     }
 
-    // --- النقر الذكي على الخلايا (Smart Click with SweetAlert) ---
     window.handleMonthClick = async function(rowIndex, monthIndex, rowType) {
         if (!canEdit(rowType)) return;
 
         let statusObject = window.currentData.rows[rowIndex].months[monthIndex];
         let monthName = window.currentData.monthNames[monthIndex];
         
-        // الحالة 1: متأخر -> نريد رفعه
         if (statusObject.status === '✘') {
             const { value: formValues } = await Swal.fire({
                 title: `رفع مستخلص: ${monthName}`,
@@ -616,7 +651,6 @@
                 window.saveToFirebase();
             }
         } 
-        // الحالة 2: مرفوع -> نريد تعديله أو حذفه
         else {
             const result = await Swal.fire({
                 title: `تعديل مستخلص: ${monthName}`,
@@ -637,7 +671,6 @@
             });
 
             if (result.isConfirmed) {
-                // تعديل البيانات
                 const { value: formValues } = await Swal.fire({
                     title: 'تحديث البيانات',
                     html:
@@ -654,7 +687,6 @@
                     window.saveToFirebase();
                 }
             } else if (result.isDenied) {
-                // حذف
                 statusObject.status = '✘';
                 statusObject.letterNum = '';
                 statusObject.submissionDate = '';
@@ -667,42 +699,16 @@
     window.editHeader = async function(index) {
         if (!window.userRole || window.userRole !== 'super') return;
         let oldVal = window.currentData.monthNames[index];
-        
-        const { value: newVal } = await Swal.fire({
-            title: 'تعديل اسم الشهر',
-            input: 'text',
-            inputValue: oldVal,
-            showCancelButton: true,
-            confirmButtonText: 'حفظ'
-        });
-
-        if (newVal) {
-            window.currentData.monthNames[index] = newVal;
-            renderTable();
-            window.saveToFirebase();
-        }
+        const { value: newVal } = await Swal.fire({ title: 'تعديل اسم الشهر', input: 'text', inputValue: oldVal, showCancelButton: true, confirmButtonText: 'حفظ' });
+        if (newVal) { window.currentData.monthNames[index] = newVal; renderTable(); window.saveToFirebase(); }
     };
 
     window.editCell = async function(rowIndex, field) {
         let rowType = window.currentData.rows[rowIndex].type;
         if (!canEdit(rowType)) return;
-        
         let oldVal = window.currentData.rows[rowIndex][field];
-        
-        const { value: newVal } = await Swal.fire({
-            title: 'تعديل القيمة',
-            input: 'text',
-            inputValue: oldVal,
-            showCancelButton: true,
-            confirmButtonText: 'حفظ',
-            cancelButtonText: 'إلغاء'
-        });
-
-        if (newVal !== undefined) {
-            window.currentData.rows[rowIndex][field] = newVal;
-            renderTable();
-            window.saveToFirebase();
-        }
+        const { value: newVal } = await Swal.fire({ title: 'تعديل القيمة', input: 'text', inputValue: oldVal, showCancelButton: true, confirmButtonText: 'حفظ', cancelButtonText: 'إلغاء' });
+        if (newVal !== undefined) { window.currentData.rows[rowIndex][field] = newVal; renderTable(); window.saveToFirebase(); }
     };
 </script>
 
