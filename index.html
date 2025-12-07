@@ -37,6 +37,7 @@
         .header-text h2 { color: #666; margin: 5px 0 0 0; font-size: 15px; }
         .logo-container img { max-height: 100px; width: auto; }
 
+        /* --- لوحة الإحصائيات --- */
         .dashboard-container {
             display: flex; gap: 20px; margin-bottom: 25px; 
             flex-wrap: wrap; align-items: stretch;
@@ -63,6 +64,7 @@
         .stat-card.red-border { border-right-color: var(--danger); }
         .stat-card.red-border .stat-number { color: var(--danger); }
 
+        /* --- لوحة التحكم --- */
         .admin-panel {
             background: var(--secondary-color); color: white; padding: 15px 20px;
             border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(44, 62, 80, 0.3);
@@ -83,79 +85,29 @@
         .btn-new-month { background: #8e44ad; color: white; }
         .btn-excel { background: #217346; color: white; display: flex; align-items: center; gap: 5px; }
         .btn-print { background: #fff; color: var(--secondary-color); }
-        .btn-password { background: #e67e22; color: white; } /* زر تغيير الباسورد */
+        .btn-password { background: #e67e22; color: white; }
         .super-admin-only { display: none; } 
 
-        /* --- شريط الأدوات والبحث (تم التعديل لمنع التداخل) --- */
+        /* --- شريط الأدوات (تم الإصلاح) --- */
         .toolbar-section {
-            display: flex;
-            align-items: center;
-            background-color: #fff;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #e1e4e8;
-            gap: 15px;
-            flex-wrap: wrap; /* يسمح بالنزول لسطر جديد عند الضرورة */
+            display: flex; align-items: center; background-color: #fff; padding: 15px;
+            border-radius: 10px; margin-bottom: 20px; border: 1px solid #e1e4e8;
+            gap: 15px; flex-wrap: wrap;
         }
         
         .search-box {
-            flex: 1; /* يأخذ المساحة المتبقية بذكاء */
-            min-width: 250px; /* الحد الأدنى للعرض لمنع الانكماش */
-            position: relative;
+            flex: 1; min-width: 250px; position: relative;
         }
-
         .search-input {
-            width: 100%;
-            padding: 10px 40px 10px 15px; /* مساحة للأيقونة */
-            border: 1px solid #ced4da;
-            border-radius: 8px;
-            font-family: 'Tajawal';
-            font-size: 14px;
-            box-sizing: border-box; /* يضمن حساب الحواف داخل العرض */
-            transition: border-color 0.3s;
+            width: 100%; padding: 10px 40px 10px 10px; border: 1px solid #ccc; border-radius: 6px;
+            font-family: 'Tajawal'; font-size: 14px; box-sizing: border-box;
         }
-        
-        .search-input:focus {
-            border-color: var(--primary-color);
-            outline: none;
-        }
-
-        .search-icon {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #999;
-            pointer-events: none; /* يسمح بالنقر خلال الأيقونة */
-        }
+        .search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #999; pointer-events: none; }
 
         .filter-select {
-            padding: 10px 15px;
-            border-radius: 8px;
-            border: 1px solid #ced4da;
-            font-family: 'Tajawal';
-            font-size: 14px;
-            background-color: #f8f9fa;
-            cursor: pointer;
-            min-width: 220px; /* عرض ثابت للقائمة */
-            flex-shrink: 0; /* يمنع القائمة من الانكماش */
-        }
-
-        /* تحسين للموبايل */
-        @media (max-width: 768px) {
-            .toolbar-section {
-                flex-direction: column; /* ترتيب العناصر عمودياً */
-                align-items: stretch; /* تمديد العناصر لملء العرض */
-            }
-            .search-box, .filter-select {
-                width: 100%;
-                min-width: 100%;
-            }
-            .legend {
-                justify-content: center;
-                margin-top: 10px;
-            }
+            padding: 10px 15px; border-radius: 8px; border: 1px solid #ccc;
+            font-family: 'Tajawal'; font-size: 14px; background-color: #f8f9fa;
+            cursor: pointer; min-width: 220px; flex-shrink: 0;
         }
 
         /* --- الجدول --- */
@@ -206,11 +158,22 @@
         }
         #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
 
+        /* --- تنسيق الطباعة --- */
         @media print {
             @page { size: landscape; margin: 5mm; }
             body { background: white; transform: scale(0.65); transform-origin: top right; width: 150%; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            
             .container { box-shadow: none; padding: 0; width: 100% !important; max-width: none !important; }
-            .admin-panel, .btn-print, #loginSection, .toolbar-section, #toast, .dashboard-container { display: none !important; }
+            .admin-panel, .btn-print, #loginSection, .toolbar-section, #toast { display: none !important; }
+            
+            /* التحكم في ظهور الداش بورد حسب الكلاس */
+            body.hide-dash-print .dashboard-container { display: none !important; }
+            
+            /* تحسين شكل الداش بورد للطباعة */
+            .dashboard-container { margin-bottom: 20px; border-bottom: 2px solid #ccc; padding-bottom: 10px; }
+            .stat-card { box-shadow: none; border: 1px solid #ccc; }
+            .chart-container { border: none; box-shadow: none; max-height: 200px; }
+
             th, td { border: 1px solid #000 !important; font-size: 10px; padding: 2px !important; color: black !important; }
             .sticky-col-1, .sticky-col-2, .sticky-col-3, thead th { position: static !important; box-shadow: none !important; border: 1px solid #000 !important; }
             .type-medical { background-color: #e3f2fd !important; }
@@ -229,7 +192,11 @@
                 <span style="font-weight: 800; font-size: 18px;">🔒 بوابة الإدارة</span>
                 <span id="roleDisplay" style="color: #f1c40f; font-weight: bold; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px;"></span>
             </div>
-            <div style="display: flex; gap: 10px;">
+            
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <label style="color: white; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 5px;">
+                    <input type="checkbox" id="printDashCheck" checked onchange="togglePrintDash()"> طباعة الإحصائيات
+                </label>
                 <button class="btn-excel" onclick="exportToExcel()">📊 تصدير Excel</button>
                 <button class="btn-print" onclick="window.print()">🖨 طباعة</button>
             </div>
@@ -334,13 +301,11 @@
     const db = getDatabase(app);
     
     window.currentData = { monthNames: [], rows: [] };
-    // القيم الافتراضية لكلمات المرور (يتم تحديثها من القاعدة)
     window.appPasswords = { super: '1234', medical: '1111', non_medical: '2222' };
     window.userRole = null;
     let myChart = null;
     const emptyMonthData = { status: "✘", letterNum: "", submissionDate: "" };
 
-    // --- تحميل البيانات + تحميل كلمات المرور ---
     const dataRef = ref(db, 'kpi_data_v4'); 
     onValue(dataRef, (snapshot) => {
         const data = snapshot.val();
@@ -362,15 +327,10 @@
         }
     });
 
-    // جلب كلمات المرور من قاعدة البيانات
     const passRef = ref(db, 'app_settings/passwords');
     onValue(passRef, (snapshot) => {
-        if(snapshot.exists()) {
-            window.appPasswords = snapshot.val();
-        } else {
-            // إذا لم توجد، ننشئها بالقيم الافتراضية
-            set(passRef, window.appPasswords);
-        }
+        if(snapshot.exists()) { window.appPasswords = snapshot.val(); } 
+        else { set(passRef, window.appPasswords); }
     });
 
     function showToast(message, isSuccess = true) {
@@ -387,7 +347,6 @@
             .catch((error) => { showToast("فشل الحفظ ❌", false); });
     };
 
-    // --- تحديث لوحة الإحصائيات ---
     function updateDashboard() {
         if(!window.currentData.rows) return;
         const filter = document.getElementById('typeFilter').value;
@@ -420,7 +379,16 @@
         });
     }
 
-    // --- تصدير Excel ---
+    // --- وظيفة تبديل طباعة الداش بورد ---
+    window.togglePrintDash = function() {
+        const checkbox = document.getElementById('printDashCheck');
+        if (checkbox.checked) {
+            document.body.classList.remove('hide-dash-print');
+        } else {
+            document.body.classList.add('hide-dash-print');
+        }
+    }
+
     window.exportToExcel = function() {
         const wb = XLSX.utils.book_new();
         const headers = ["المستشفى", "نوع العقد", "المقاول", "عدد المتأخرات", ...window.currentData.monthNames, "ملاحظات"];
@@ -443,7 +411,6 @@
         XLSX.writeFile(wb, "KPI_Report_Tabuk.xlsx");
     }
 
-    // --- الجدول والفلترة والبحث ---
     window.applyFilter = function() { renderTable(); };
 
     window.renderTable = function() {
@@ -539,7 +506,6 @@
         tr.innerHTML += `<td class="${editClass} note-text" ${isEditable ? `onclick="editCell(${rowIndex}, 'notes')"` : ''}>${row.notes}</td>`;
     }
 
-    // --- الصلاحيات والوظائف الإدارية ---
     window.adminLogin = async function() {
         const { value: pass } = await Swal.fire({
             title: 'تسجيل الدخول', input: 'password', inputLabel: 'أدخل كلمة المرور',
@@ -548,7 +514,6 @@
         if (!pass) return;
 
         let roleName = "";
-        // المقارنة بكلمات المرور من قاعدة البيانات
         if (pass === window.appPasswords.super) { window.userRole = 'super'; roleName = "(المدير العام)"; } 
         else if (pass === window.appPasswords.medical) { window.userRole = 'medical'; roleName = "(مشرف طبي)"; } 
         else if (pass === window.appPasswords.non_medical) { window.userRole = 'non-medical'; roleName = "(مشرف غير طبي)"; } 
@@ -566,41 +531,21 @@
         Swal.fire({ icon: 'success', title: 'أهلاً بك', text: roleName, timer: 1500, showConfirmButton: false });
     }
 
-    // دالة تغيير كلمات المرور (للمدير العام فقط)
     window.changePasswords = async function() {
         if (!window.userRole || window.userRole !== 'super') return;
-
         const { value: formValues } = await Swal.fire({
             title: 'تغيير كلمات المرور',
             html:
-                '<label>المدير العام (Super Admin)</label>' +
-                `<input id="swal-pass-super" class="swal2-input" value="${window.appPasswords.super}">` +
-                '<label>المشرف الطبي</label>' +
-                `<input id="swal-pass-med" class="swal2-input" value="${window.appPasswords.medical}">` +
-                '<label>المشرف غير الطبي</label>' +
-                `<input id="swal-pass-non" class="swal2-input" value="${window.appPasswords.non_medical}">`,
-            focusConfirm: false,
-            showCancelButton: true,
-            confirmButtonText: 'حفظ التغييرات',
-            preConfirm: () => {
-                return {
-                    super: document.getElementById('swal-pass-super').value,
-                    medical: document.getElementById('swal-pass-med').value,
-                    non_medical: document.getElementById('swal-pass-non').value
-                }
-            }
+                '<label>المدير العام</label><input id="swal-pass-super" class="swal2-input" value="' + window.appPasswords.super + '">' +
+                '<label>المشرف الطبي</label><input id="swal-pass-med" class="swal2-input" value="' + window.appPasswords.medical + '">' +
+                '<label>المشرف غير الطبي</label><input id="swal-pass-non" class="swal2-input" value="' + window.appPasswords.non_medical + '">',
+            focusConfirm: false, showCancelButton: true, confirmButtonText: 'حفظ التغييرات',
+            preConfirm: () => { return { super: document.getElementById('swal-pass-super').value, medical: document.getElementById('swal-pass-med').value, non_medical: document.getElementById('swal-pass-non').value } }
         });
-
         if (formValues) {
-            // حفظ في Firebase
             set(ref(db, 'app_settings/passwords'), formValues)
-                .then(() => {
-                    window.appPasswords = formValues;
-                    Swal.fire('تم الحفظ', 'تم تحديث كلمات المرور بنجاح', 'success');
-                })
-                .catch((error) => {
-                    Swal.fire('خطأ', 'فشل حفظ كلمات المرور', 'error');
-                });
+                .then(() => { window.appPasswords = formValues; Swal.fire('تم الحفظ', 'تم تحديث كلمات المرور بنجاح', 'success'); })
+                .catch((error) => { Swal.fire('خطأ', 'فشل حفظ كلمات المرور', 'error'); });
         }
     }
 
@@ -632,8 +577,6 @@
                 rows: newRows
             };
             window.saveToFirebase();
-            
-            // التأكد من وجود كلمات مرور افتراضية عند إعادة الضبط
             set(ref(db, 'app_settings/passwords'), window.appPasswords);
         }
     };
