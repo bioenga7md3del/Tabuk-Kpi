@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نظام إدارة عقود الصيانة</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -25,8 +26,9 @@
 
     <div style="display:flex; gap:10px; align-items:center;">
         <span id="roleDisplay" style="color:var(--primary); font-weight:bold; font-size:12px;"></span>
-        <button class="btn-primary" id="loginBtn" onclick="adminLogin()">🔑 دخول</button>
-        <button class="btn-danger hidden" id="logoutBtn" onclick="location.reload()">خروج</button>
+        
+        <button class="btn-blue" id="loginBtn" onclick="adminLogin()">🔑 دخول</button>
+        <button class="btn-red hidden" id="logoutBtn" onclick="location.reload()">خروج</button>
     </div>
 </nav>
 
@@ -39,29 +41,22 @@
             <div style="display:flex; gap:5px; flex-wrap:wrap;">
                 <button class="btn-primary super-admin-only" onclick="refreshMonthsSystem()">📅 تحديث الشهور</button>
                 <button class="btn-warning super-admin-only" onclick="systemReset()">⚠ تهيئة</button>
+                <button class="btn-purple super-admin-only" onclick="changePasswords()">🔑 الباسورد</button>
                 <div style="width:1px; background:#ddd; margin:0 10px;"></div>
                 <button class="btn-success" onclick="exportToExcel()">📊 Excel</button>
-                <button class="btn-primary" onclick="window.print()">🖨 طباعة</button>
             </div>
         </div>
 
+        <div id="loginSection" style="text-align:center; margin: 20px 0;">
+            <p style="color:#666;">يرجى تسجيل الدخول للتحكم في النظام</p>
+            <button class="btn-blue" style="padding:10px 30px; font-size:16px;" onclick="adminLogin()">🔑 تسجيل دخول</button>
+        </div>
+
         <div class="stats-grid">
-            <div class="stat-card">
-                <span class="stat-number" id="countHospitals">0</span>
-                <span class="stat-label">المواقع</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-number" id="countContracts">0</span>
-                <span class="stat-label">العقود النشطة</span>
-            </div>
-            <div class="stat-card" style="border-right-color: var(--danger);">
-                <span class="stat-number" id="countLate" style="color:var(--danger)">0</span>
-                <span class="stat-label">المتأخرات</span>
-            </div>
-            <div class="stat-card" style="border-right-color: var(--success);">
-                <span class="stat-number" id="complianceRate" style="color:var(--success)">0%</span>
-                <span class="stat-label">نسبة الإنجاز</span>
-            </div>
+            <div class="stat-card"><span class="stat-number" id="countHospitals">0</span><span class="stat-label">المواقع</span></div>
+            <div class="stat-card"><span class="stat-number" id="countContracts">0</span><span class="stat-label">العقود النشطة</span></div>
+            <div class="stat-card red-border"><span class="stat-number" id="countLate" style="color:var(--danger)">0</span><span class="stat-label">المتأخرات</span></div>
+            <div class="stat-card green-border"><span class="stat-number" id="complianceRate" style="color:var(--success)">0%</span><span class="stat-label">نسبة الإنجاز</span></div>
         </div>
 
         <div class="toolbar-section">
@@ -73,8 +68,8 @@
             </div>
             <select id="typeFilter" class="form-control" style="width:auto; min-width:150px;" onchange="renderTable()">
                 <option value="all">كل العقود</option>
-                <option value="طبي">عقود طبية</option>
-                <option value="غير طبي">عقود غير طبية</option>
+                <option value="طبي">طبي</option>
+                <option value="غير طبي">غير طبي</option>
             </select>
         </div>
 
@@ -91,9 +86,7 @@
             <div class="section-title"><h2>إدارة سجل العقود</h2></div>
             <button class="btn-success" onclick="openModal('contractModal')">➕ إضافة عقد جديد</button>
         </div>
-        
-        <div id="contractsGrid" class="cards-grid">
-            </div>
+        <div id="contractsGrid" class="cards-grid"></div>
     </section>
 
     <section id="contractors-view" class="page-section">
@@ -101,9 +94,7 @@
             <div class="section-title"><h2>إدارة سجل المقاولين</h2></div>
             <button class="btn-purple" onclick="openModal('contractorModal')">➕ إضافة مقاول جديد</button>
         </div>
-
-        <div id="contractorsGrid" class="cards-grid">
-            </div>
+        <div id="contractorsGrid" class="cards-grid"></div>
     </section>
 
 </div>
