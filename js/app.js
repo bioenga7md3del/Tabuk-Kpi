@@ -14,10 +14,9 @@ onValue(dbRef, (snapshot) => {
     const table = document.getElementById('mainTable');
     
     if (data) {
-        // حماية البيانات من الـ null
         window.appData.contractors = data.contractors || {};
         window.appData.contracts = data.contracts || {};
-        window.appData.monthNames = data.monthNames || []; // مهم جداً: مصفوفة فارغة إذا لم توجد شهور
+        window.appData.monthNames = data.monthNames || [];
         
         renderTable();
         updateStats();
@@ -25,13 +24,13 @@ onValue(dbRef, (snapshot) => {
         if (loader) loader.style.display = 'none';
         if (table) table.style.display = 'table';
     } else {
-        if (loader) loader.innerHTML = "قاعدة البيانات جديدة. يرجى تهيئة النظام وتسجيل الدخول.";
+        if (loader) loader.innerHTML = "النظام جاهز. الرجاء تسجيل الدخول وتهيئة النظام.";
     }
 });
 
 onValue(ref(db, 'app_settings/passwords'), (s) => { if(s.exists()) window.appPasswords = s.val(); });
 
-// --- Helpers ---
+// --- Helper Functions ---
 window.showToast = function(msg) {
     const t = document.getElementById("toast"); 
     if(t) { t.innerText = msg; t.className = "show"; setTimeout(() => t.className = "", 2500); }
@@ -50,7 +49,7 @@ window.closeModal = function(id) {
 // --- Month Logic ---
 window.refreshMonthsSystem = async function() {
     if (!window.userRole || window.userRole !== 'super') return;
-    if(!(await Swal.fire({title:'تحديث الجدول الزمني؟', text:'سيتم إنشاء الشهور من يناير للسنة الحالية.', icon:'warning', showCancelButton:true})).isConfirmed) return;
+    if(!(await Swal.fire({title:'تحديث الجدول الزمني؟', text:'سيتم ضبط الأعمدة من يناير للسنة الحالية.', icon:'warning', showCancelButton:true})).isConfirmed) return;
 
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -58,12 +57,10 @@ window.refreshMonthsSystem = async function() {
     const arabicMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
     let newMonthNames = [];
 
-    // من يناير (0) إلى الشهر السابق (currentMonth - 1)
-    // إذا كنا في يناير (0)، فلن يتم إنشاء شيء (وهذا صحيح)
     for (let i = 0; i < currentMonth; i++) {
         newMonthNames.push(`${arabicMonths[i]} ${currentYear}`);
     }
-    newMonthNames.reverse(); // الأحدث أولاً
+    newMonthNames.reverse();
 
     const updates = {};
     updates['app_db_v2/monthNames'] = newMonthNames;
@@ -128,7 +125,6 @@ window.saveNewContract = function() {
 
     if(!hosp || !contId) { Swal.fire('نقص بيانات','المستشفى والمقاول مطلوبان','error'); return; }
 
-    // التحقق من وجود شهور، إذا لم توجد، ننشئ مصفوفة فارغة
     const monthsCount = window.appData.monthNames ? window.appData.monthNames.length : 0;
     const emptyMonths = Array(monthsCount).fill().map(() => ({ 
         status: "late", financeStatus: "late", claimNum: "", letterNum: "", submissionDate: "", returnNotes: "" 
@@ -142,22 +138,18 @@ window.saveNewContract = function() {
 
     push(ref(db, 'app_db_v2/contracts'), newContract).then(() => {
         showToast("تم الحفظ"); closeModal('contractModal');
-        // Clear fields
         document.getElementById('form-hospital').value = '';
         document.getElementById('form-contract-num').value = '';
         document.getElementById('form-value').value = '';
     });
 };
 
-// --- Table Rendering (Safety Fixes) ---
+// --- Table Rendering (تم حذف الأعمدة وإضافة التلميح) ---
 window.renderTable = function() {
     const { contracts, contractors, monthNames } = window.appData;
     
-    // Safety check for search elements
     const searchHospEl = document.getElementById('searchHospital');
     const searchContEl = document.getElementById('searchContractor');
-    
-    // If elements don't exist yet (DOM loading), exit
     if (!searchHospEl || !searchContEl) return;
 
     const searchHosp = searchHospEl.value.toLowerCase();
@@ -167,23 +159,16 @@ window.renderTable = function() {
     const hRow = document.getElementById('headerRow');
     if(!hRow) return;
 
-    // Build Header
+    // تم حذف أعمدة البداية والنهاية والقيمة من هنا
     hRow.innerHTML = `
         <th class="sticky-col-1">الموقع / المستشفى</th>
         <th class="sticky-col-2">نوع العقد</th>
         <th class="sticky-col-3">المقاول</th>
-        <th style="min-width:90px">البداية</th>
-        <th style="min-width:90px">النهاية</th>
-        <th style="min-width:100px">القيمة</th>
         <th style="min-width:50px">المتأخرات</th>
     `;
     
-    // Check if monthNames exists and is array
     if (Array.isArray(monthNames) && monthNames.length > 0) {
         monthNames.forEach(m => hRow.innerHTML += `<th style="min-width:110px">${m}</th>`);
-    } else {
-        // If no months, maybe show a placeholder or nothing
-        // This prevents the table from "crashing" visually
     }
     
     hRow.innerHTML += `<th style="min-width:200px">ملاحظات</th>`;
@@ -203,22 +188,21 @@ window.renderTable = function() {
             
             const lateCount = (row.months||[]).filter(m => m.financeStatus === 'late').length;
             const badge = lateCount > 0 ? 'badge-red' : 'badge-green';
+            
+            // تجهيز نص التلميح (Tooltip)
             const formattedValue = row.value ? Number(row.value).toLocaleString() : '-';
+            const contractDetails = `بداية العقد: ${row.startDate || '-'}\nنهاية العقد: ${row.endDate || '-'}\nالقيمة: ${formattedValue} ريال`;
 
             tr.innerHTML = `
                 <td class="sticky-col-1">${row.hospital}</td>
-                <td class="sticky-col-2" style="font-weight:bold; color:${row.type==='طبي'?'var(--primary)':'#d35400'}">${row.type}</td>
+                <td class="sticky-col-2" title="${contractDetails}" style="cursor:help;">
+                    <span class="${row.type==='طبي' ? 'type-medical' : 'type-non-medical'}">${row.type}</span>
+                </td>
                 <td class="sticky-col-3">${cName}</td>
-                <td style="font-size:12px; color:#555;">${row.startDate || '-'}</td>
-                <td style="font-size:12px; color:#555;">${row.endDate || '-'}</td>
-                <td style="font-size:12px; font-weight:bold;">${formattedValue}</td>
                 <td><span class="badge ${badge}">${lateCount}</span></td>
             `;
 
-            // Ensure we handle case where row.months might be undefined or shorter than monthNames
             const rowMonths = row.months || [];
-            
-            // Loop based on monthNames to ensure columns align
             if (Array.isArray(monthNames)) {
                 monthNames.forEach((mName, idx) => {
                     const m = rowMonths[idx];
@@ -228,7 +212,6 @@ window.renderTable = function() {
                         else if(m.financeStatus === 'returned') { icon='⚠️'; cls='status-returned'; tit=`إعادة: ${m.returnNotes}`; }
                         tr.innerHTML += `<td class="${cls}" title="${tit}" onclick="handleCell('${row.id}', ${idx})">${icon}</td>`;
                     } else {
-                        // Cell exists in header but data missing in row (safe fallback)
                         tr.innerHTML += `<td>-</td>`;
                     }
                 });
@@ -242,39 +225,58 @@ window.renderTable = function() {
     updateStats();
 };
 
+// --- FIX: Cell Handling (التحديث وإغلاق النافذة) ---
 window.handleCell = async function(cid, midx) {
     const c = window.appData.contracts[cid];
     if(!canEdit(c.type)) return;
     const mData = c.months[midx];
-    
+    const mName = window.appData.monthNames[midx];
+    const curStatus = mData.financeStatus || 'late';
+
     const {value: v} = await Swal.fire({
-        title: 'بيانات المستخلص',
+        title: `${c.hospital} - ${mName}`,
         html: `
-            <input id="sw-cl" class="swal2-input" placeholder="رقم المطالبة" value="${mData.claimNum||''}">
-            <input id="sw-le" class="swal2-input" placeholder="رقم الخطاب" value="${mData.letterNum||''}">
-            <input id="sw-da" class="swal2-input" type="date" value="${mData.submissionDate||''}">
-            <select id="sw-st" class="swal2-select">
-                <option value="late" ${mData.financeStatus==='late'?'selected':''}>لم يرفع (متأخر)</option>
-                <option value="sent" ${mData.financeStatus==='sent'?'selected':''}>تم الرفع للمالية</option>
-                <option value="returned" ${mData.financeStatus==='returned'?'selected':''}>إعادة للموقع</option>
-            </select>
-            <input id="sw-no" class="swal2-input" placeholder="سبب الإعادة" value="${mData.returnNotes||''}">
+            <div style="text-align:right;">
+                <label>رقم المطالبة</label><input id="sw-cl" class="swal2-input" value="${mData.claimNum||''}">
+                <label>رقم الخطاب</label><input id="sw-le" class="swal2-input" value="${mData.letterNum||''}">
+                <label>تاريخ الرفع</label><input id="sw-da" class="swal2-input" type="date" value="${mData.submissionDate||''}">
+                <label>الحالة</label>
+                <select id="sw-status" class="swal2-select">
+                    <option value="late" ${curStatus==='late'?'selected':''}>لم يرفع (متأخر)</option>
+                    <option value="sent" ${curStatus==='sent'?'selected':''}>تم الرفع للمالية</option>
+                    <option value="returned" ${curStatus==='returned'?'selected':''}>إعادة للموقع</option>
+                </select>
+                <div id="note-area" style="display:${curStatus==='returned'?'block':'none'}">
+                    <label style="color:orange">سبب الإعادة / ملاحظات</label>
+                    <textarea id="sw-notes" class="swal2-textarea">${mData.returnNotes||''}</textarea>
+                </div>
+            </div>
         `,
+        didOpen: () => document.getElementById('sw-status').addEventListener('change', (e) => document.getElementById('note-area').style.display = e.target.value==='returned'?'block':'none'),
+        showCancelButton: true, confirmButtonText: 'حفظ',
         preConfirm: () => ({
             claimNum: document.getElementById('sw-cl').value,
             letterNum: document.getElementById('sw-le').value,
-            submissionDate: document.getElementById('sw-date').value,
-            financeStatus: document.getElementById('sw-st').value,
-            returnNotes: document.getElementById('sw-no').value
+            submissionDate: document.getElementById('sw-da').value,
+            financeStatus: document.getElementById('sw-status').value,
+            returnNotes: document.getElementById('sw-notes').value
         })
     });
 
-    if(v) update(ref(db, `app_db_v2/contracts/${cid}/months/${midx}`), v).then(()=>showToast("تم"));
+    if(v) {
+        // تحديث الفيربيز
+        update(ref(db, `app_db_v2/contracts/${cid}/months/${midx}`), v).then(() => {
+            // **إصلاح هام:** تحديث البيانات المحلية وإعادة رسم الجدول فوراً ليظهر التغيير
+            window.appData.contracts[cid].months[midx] = v;
+            renderTable(); 
+            showToast("تم تحديث الحالة بنجاح");
+        });
+    }
 };
 
 window.editNote = async function(cid) {
-    const {value:t} = await Swal.fire({input:'textarea', inputValue:window.appData.contracts[cid].notes});
-    if(t!==undefined) update(ref(db, `app_db_v2/contracts/${cid}`), {notes:t});
+    const {value:t} = await Swal.fire({title:'ملاحظات العقد', input:'textarea', inputValue:window.appData.contracts[cid].notes});
+    if(t!==undefined) update(ref(db, `app_db_v2/contracts/${cid}`), {notes:t}).then(() => window.showToast("تم حفظ الملاحظة"));
 };
 
 window.systemReset = async function() {
@@ -286,18 +288,11 @@ window.systemReset = async function() {
 
 window.updateStats = function() {
     const cs = Object.values(window.appData.contracts);
-    const countHospitals = document.getElementById('countHospitals');
-    if(countHospitals) countHospitals.innerText = new Set(cs.map(c=>c.hospital)).size;
-    
-    const countContractors = document.getElementById('countContractors');
-    if(countContractors) countContractors.innerText = Object.keys(window.appData.contractors).length;
-    
-    const countContracts = document.getElementById('countContracts');
-    if(countContracts) countContracts.innerText = cs.length;
-    
+    document.getElementById('countHospitals').innerText = new Set(cs.map(c=>c.hospital)).size;
+    document.getElementById('countContractors').innerText = Object.keys(window.appData.contractors).length;
+    document.getElementById('countContracts').innerText = cs.length;
     let l = 0; cs.forEach(c => (c.months||[]).forEach(m => {if(m.financeStatus==='late') l++}));
-    const countLate = document.getElementById('countLate');
-    if(countLate) countLate.innerText = l;
+    document.getElementById('countLate').innerText = l;
 };
 
 window.adminLogin = async function() {
@@ -309,7 +304,7 @@ window.adminLogin = async function() {
     
     document.getElementById('loginSection').style.display='none';
     document.getElementById('adminControls').style.display='flex';
-    document.getElementById('roleDisplay').innerText = window.userRole;
+    document.getElementById('roleDisplay').innerText = window.userRole==='super' ? '(مدير عام)' : '(مشرف)';
     document.querySelectorAll('.super-admin-only').forEach(b => b.style.display = window.userRole==='super'?'inline-block':'none');
     renderTable();
 };
