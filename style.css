@@ -20,7 +20,7 @@ body { font-family: 'Tajawal', sans-serif; background-color: var(--bg); margin: 
 .nav-item { padding: 8px 12px; cursor: pointer; font-weight: 600; color: #555; border-radius: 6px; transition: 0.3s; }
 .nav-item:hover { background: #eef2f5; color: var(--primary); }
 .nav-item.active { background: var(--primary); color: white; }
-.restricted-tab { display: none; } /* مخفي لغير الأدمن */
+.restricted-tab { display: none; }
 
 /* --- Container --- */
 .main-content { padding: 20px; max-width: 98%; margin: 0 auto; }
@@ -30,7 +30,7 @@ body { font-family: 'Tajawal', sans-serif; background-color: var(--bg); margin: 
 
 /* --- Admin Panel --- */
 .admin-panel { background: white; padding: 12px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-.admin-controls { display: none; gap: 5px; } /* مخفي حتى تسجيل الدخول */
+.admin-controls { display: none; gap: 5px; } 
 
 button { padding: 7px 14px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Tajawal'; font-weight: bold; font-size: 12px; transition: 0.2s; display: inline-flex; align-items: center; gap: 5px; }
 button:hover { transform: translateY(-2px); opacity: 0.9; }
@@ -40,29 +40,51 @@ button:hover { transform: translateY(-2px); opacity: 0.9; }
 .btn-warning { background: var(--warning); color: #333; }
 .btn-purple { background: #8e44ad; color: white; }
 
-/* --- Stats & Dashboard --- */
+/* --- Stats --- */
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 20px; }
 .stat-card { background: white; padding: 15px; border-radius: 8px; border: 1px solid #eee; border-right: 4px solid var(--primary); text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
 .stat-number { font-size: 24px; font-weight: 800; color: var(--secondary); display: block; }
 .stat-label { font-size: 11px; color: #777; font-weight: bold; }
 
 /* --- KPI Table --- */
-.table-wrapper { overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); border: 1px solid var(--border-color); }
+.table-wrapper { overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); border: 1px solid var(--border-color); padding-bottom: 50px; /* مساحة للـ Tooltip */ }
 table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1400px; }
-thead th { background: var(--primary); color: white; padding: 10px 5px; position: sticky; top: 0; z-index: 100; font-size: 12px; border-bottom: 2px solid #002a5c; border-right: 1px solid rgba(255,255,255,0.1); }
-td { padding: 5px; text-align: center; border-bottom: 1px solid #eee; border-right: 1px solid #eee; vertical-align: middle; font-size: 12px; height: 35px; color: #333; }
 
-/* Sticky Cols */
-.sticky-col-1 { position: sticky; right: 0; z-index: 50; background: #f9f9f9; border-left: 2px solid #ccc; min-width: 160px; font-weight: bold; }
-.sticky-col-2 { position: sticky; right: 160px; z-index: 49; background: #fff; border-left: 1px solid #ddd; min-width: 80px; cursor: help; }
-.sticky-col-3 { position: sticky; right: 240px; z-index: 50; background: #f9f9f9; border-left: 1px solid #ddd; min-width: 140px; box-shadow: -3px 0 5px rgba(0,0,0,0.05); }
+thead th { 
+    background: var(--primary); color: white; padding: 10px 5px; 
+    position: sticky; top: 0; z-index: 100; font-size: 12px; 
+    border-bottom: 2px solid #002a5c; border-right: 1px solid rgba(255,255,255,0.1); 
+}
+
+td { 
+    padding: 5px; text-align: center; border-bottom: 1px solid #eee; 
+    border-right: 1px solid #eee; vertical-align: middle; font-size: 12px; height: 35px; 
+    color: #333 !important; /* ✅ إجبار اللون الأسود */
+}
+
+/* Sticky Cols Fix */
+.sticky-col-1, .sticky-col-2, .sticky-col-3 { 
+    position: sticky; z-index: 50; 
+    color: #333 !important; /* ✅ حل مشكلة اللون الأبيض */
+}
+
+.sticky-col-1 { right: 0; background: #f9f9f9; border-left: 2px solid #ccc; min-width: 160px; font-weight: bold; }
+.sticky-col-2 { right: 160px; z-index: 49; background: #fff; border-left: 1px solid #ddd; min-width: 80px; }
+.sticky-col-3 { right: 240px; background: #f9f9f9; border-left: 1px solid #ddd; min-width: 140px; box-shadow: -3px 0 5px rgba(0,0,0,0.05); }
+
 thead th:nth-child(1) { right: 0; z-index: 110; min-width: 160px; }
 thead th:nth-child(2) { right: 160px; z-index: 110; min-width: 80px; }
 thead th:nth-child(3) { right: 240px; z-index: 110; min-width: 140px; box-shadow: -3px 0 5px rgba(0,0,0,0.1); }
 
 /* Colors */
 tr.row-medical td { background-color: var(--medical-bg); }
+/* تطبيق اللون على الأعمدة المثبتة أيضاً */
+tr.row-medical td.sticky-col-1, tr.row-medical td.sticky-col-3 { background-color: var(--medical-bg) !important; }
+
 tr.row-non-medical td { background-color: var(--non-medical-bg); }
+/* تطبيق اللون على الأعمدة المثبتة أيضاً */
+tr.row-non-medical td.sticky-col-1, tr.row-non-medical td.sticky-col-3 { background-color: var(--non-medical-bg) !important; }
+
 .status-ok { color: var(--success); font-size: 18px; }
 .status-late { color: var(--danger); font-size: 18px; }
 .status-returned { color: var(--warning); font-size: 18px; cursor: help; }
@@ -70,7 +92,18 @@ tr.row-non-medical td { background-color: var(--non-medical-bg); }
 .badge-red { background: var(--danger); }
 .badge-green { background: var(--success); }
 
-/* --- Cards Grid (For Management) --- */
+/* --- Tooltip (التلميح) --- */
+.tooltip-container { position: relative; display: inline-block; width: 100%; cursor: help; }
+.tooltip-text { 
+    visibility: hidden; width: 220px; background-color: #2c3e50; color: #fff; 
+    text-align: right; border-radius: 6px; padding: 10px; 
+    position: absolute; z-index: 1000; top: 100%; left: 50%; margin-left: -110px; 
+    opacity: 0; transition: opacity 0.3s; font-size: 11px; line-height: 1.6;
+    white-space: pre-line; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+.tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
+
+/* Cards Grid */
 .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
 .data-card { background: white; border-radius: 8px; padding: 15px; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: 0.2s; }
 .data-card:hover { transform: translateY(-3px); border-color: var(--primary); }
@@ -79,16 +112,11 @@ tr.row-non-medical td { background-color: var(--non-medical-bg); }
 .card-body .row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
 .card-actions { display: flex; justify-content: flex-end; gap: 5px; margin-top: 10px; border-top: 1px solid #f9f9f9; padding-top: 8px; }
 
-/* --- Filters --- */
+/* Filters */
 .toolbar-section { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; background: white; padding: 10px; border-radius: 8px; border: 1px solid #e1e1e1; }
 .form-control { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-family: 'Tajawal'; font-size: 13px; box-sizing: border-box; }
 
-/* --- Tooltip --- */
-.tooltip-container { position: relative; display: inline-block; width: 100%; }
-.tooltip-text { visibility: hidden; width: 200px; background-color: #333; color: #fff; text-align: center; border-radius: 6px; padding: 8px; position: absolute; z-index: 1000; top: 100%; left: 50%; margin-left: -100px; opacity: 0; transition: opacity 0.3s; font-size: 11px; white-space: pre-line; box-shadow: 0 5px 10px rgba(0,0,0,0.2); }
-.tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
-
-/* --- Modals & Helpers --- */
+/* Modals */
 .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
 .modal-content { background: white; width: 95%; max-width: 500px; padding: 20px; border-radius: 8px; max-height: 90vh; overflow-y: auto; }
 .form-group { margin-bottom: 12px; }
@@ -99,7 +127,7 @@ tr.row-non-medical td { background-color: var(--non-medical-bg); }
 #toast.show { visibility: visible; bottom: 50px; opacity: 1; }
 
 @media (max-width: 768px) {
-    .nav-links { display: none; } /* Simple mobile hide */
+    .nav-links { display: none; }
     .sticky-col-2, .sticky-col-3, thead th:nth-child(2), thead th:nth-child(3) { position: static !important; box-shadow: none !important; }
     .toolbar-section { flex-direction: column; }
 }
