@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>مؤشر رفع المستخلصات - الصيانة </title>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <title>مؤشر الأداء - الصيانة الطبية</title>
     
-    <style>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script> <style>
         :root {
             --primary-color: #0056b3;
             --secondary-color: #2c3e50;
@@ -18,78 +18,58 @@
             --border-color: #e0e0e0;
         }
 
-        body {
-            font-family: 'Tajawal', sans-serif;
-            background-color: var(--bg-color);
-            margin: 0;
-            padding: 20px;
-            color: var(--text-color);
-        }
+        body { font-family: 'Tajawal', sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; color: var(--text-color); }
 
         .container {
-            max-width: 100%;
-            margin: 0 auto;
-            background: white;
-            padding: 25px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-            border-radius: 15px;
-            overflow-x: auto;
+            max-width: 100%; margin: 0 auto; background: white; padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08); border-radius: 15px; overflow-x: auto;
         }
 
-        /* --- الهيدر والشعار --- */
+        /* --- الهيدر --- */
         header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 30px;
-            border-bottom: 4px solid var(--primary-color);
-            padding-bottom: 20px;
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px;
+            border-bottom: 4px solid var(--primary-color); padding-bottom: 15px;
         }
-        .header-text h1 { color: var(--primary-color); margin: 0; font-size: 28px; font-weight: 800; }
-        .header-text h2 { color: #666; margin: 5px 0 0 0; font-size: 16px; }
-        .logo-container img { max-height: 110px; width: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
+        .header-text h1 { color: var(--primary-color); margin: 0; font-size: 26px; font-weight: 800; }
+        .header-text h2 { color: #666; margin: 5px 0 0 0; font-size: 15px; }
+        .logo-container img { max-height: 100px; width: auto; }
 
-        /* --- لوحة الإحصائيات --- */
-        .stats-dashboard {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 25px;
+        /* --- لوحة الإحصائيات والرسم البياني --- */
+        .dashboard-container {
+            display: flex; gap: 20px; margin-bottom: 25px; align-items: stretch;
         }
+        
+        .stats-grid {
+            flex: 2; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;
+        }
+
+        .chart-container {
+            flex: 1; background: #fff; border: 1px solid #eee; border-radius: 10px;
+            padding: 10px; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); position: relative; max-width: 300px;
+        }
+
         .stat-card {
             background: linear-gradient(135deg, #ffffff 0%, #f9f9f9 100%);
-            padding: 15px;
-            border-radius: 10px;
-            border-right: 4px solid var(--primary-color);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            text-align: center;
-            transition: transform 0.2s;
+            padding: 15px; border-radius: 10px; border-right: 4px solid var(--primary-color);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center;
+            display: flex; flex-direction: column; justify-content: center;
         }
-        .stat-card:hover { transform: translateY(-3px); }
-        .stat-number { font-size: 24px; font-weight: 800; color: var(--primary-color); display: block; }
-        .stat-label { font-size: 13px; color: #666; font-weight: bold; }
+        .stat-number { font-size: 28px; font-weight: 800; color: var(--primary-color); }
+        .stat-label { font-size: 13px; color: #666; font-weight: bold; margin-top: 5px; }
         .stat-card.red-border { border-right-color: var(--danger); }
         .stat-card.red-border .stat-number { color: var(--danger); }
 
-        /* --- لوحة التحكم والأزرار --- */
+        /* --- أدوات التحكم --- */
         .admin-panel {
-            background: var(--secondary-color);
-            color: white;
-            padding: 15px 20px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-            box-shadow: 0 4px 15px rgba(44, 62, 80, 0.3);
+            background: var(--secondary-color); color: white; padding: 15px 20px;
+            border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(44, 62, 80, 0.3);
         }
-        
-        .admin-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px;
-        }
-
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px; }
         .admin-controls { display: none; gap: 10px; flex-wrap: wrap; }
         
         button {
-            padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer;
+            padding: 9px 16px; border: none; border-radius: 6px; cursor: pointer;
             font-family: 'Tajawal', sans-serif; font-weight: bold; font-size: 13px;
             transition: all 0.3s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
@@ -99,137 +79,81 @@
         .btn-logout { background: #e74c3c; color: white; }
         .btn-reset { background: #f39c12; color: white; }
         .btn-new-month { background: #8e44ad; color: white; }
+        .btn-excel { background: #217346; color: white; display: flex; align-items: center; gap: 5px; }
         .btn-print { background: #fff; color: var(--secondary-color); }
         .super-admin-only { display: none; } 
 
-        /* --- الفلاتر --- */
-        .filter-section {
-            display: flex; align-items: center; background-color: #fff;
-            padding: 12px 20px; border-radius: 10px; margin-bottom: 20px;
-            border: 1px solid #e1e4e8; box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+        /* --- شريط الأدوات والفلتر --- */
+        .toolbar-section {
+            display: flex; align-items: center; background-color: #fff; padding: 10px 15px;
+            border-radius: 10px; margin-bottom: 15px; border: 1px solid #e1e4e8; gap: 15px; flex-wrap: wrap;
         }
-        .filter-label { font-weight: bold; margin-left: 10px; color: var(--primary-color); }
-        .filter-select {
-            padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc;
-            font-family: 'Tajawal', sans-serif; font-size: 14px; min-width: 220px; cursor: pointer;
-            background-color: #fcfcfc;
+        
+        .search-box {
+            flex-grow: 1; position: relative;
         }
+        .search-input {
+            width: 100%; padding: 8px 35px 8px 10px; border: 1px solid #ccc; border-radius: 6px;
+            font-family: 'Tajawal'; font-size: 14px;
+        }
+        .search-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #999; }
 
-        /* --- الجدول (تصحيح التداخل) --- */
+        .filter-select { padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-family: 'Tajawal'; font-size: 14px; }
+
+        /* --- الجدول --- */
         table {
-            width: 100%;
-            /* استخدام separate بدلاً من collapse يحل مشكلة اختفاء الحدود والتداخل */
-            border-collapse: separate; 
-            border-spacing: 0;
-            min-width: 1400px; /* زيادة العرض لضمان عدم انضغاط الأعمدة */
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
+            width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1400px;
+            border: 1px solid var(--border-color); border-radius: 8px;
         }
 
         thead th {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 15px 10px;
-            font-size: 14px;
-            /* حدود يدوية للرأس */
-            border-bottom: 1px solid #004085;
-            border-right: 1px solid rgba(255,255,255,0.1);
-            position: sticky;
-            top: 0;
-            z-index: 10; /* أعلى طبقة */
+            background-color: var(--primary-color); color: white; padding: 12px 10px; font-size: 14px;
+            border-bottom: 1px solid #004085; border-right: 1px solid rgba(255,255,255,0.1);
+            position: sticky; top: 0; z-index: 10;
         }
 
         td {
-            padding: 12px 8px;
-            text-align: center;
-            font-size: 14px;
-            vertical-align: middle;
-            background-color: #fff;
-            /* حدود يدوية للخلايا */
-            border-bottom: 1px solid var(--border-color);
-            border-right: 1px solid var(--border-color);
-            transition: background 0.2s;
+            padding: 10px 8px; text-align: center; font-size: 14px; vertical-align: middle;
+            background-color: #fff; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color);
         }
 
-        tr:last-child td { border-bottom: none; }
+        /* تثبيت الأعمدة */
+        .sticky-col-1 { position: sticky; right: 0; background-color: #f8f9fa !important; z-index: 5; font-weight: bold; border-left: 2px solid var(--border-color); min-width: 180px; }
+        .sticky-col-2 { position: sticky; right: 180px; background-color: #fff !important; z-index: 4; min-width: 90px; border-left: 1px solid var(--border-color); }
+        .sticky-col-3 { position: sticky; right: 270px; background-color: #f8f9fa !important; z-index: 5; min-width: 160px; box-shadow: -5px 0 10px -5px rgba(0,0,0,0.15); border-left: 1px solid #ccc; }
         
-        /* --- تثبيت الأعمدة (Fixed Columns) --- */
-        /* العمود 1: المستشفى */
-        .sticky-col-1 {
-            position: sticky;
-            right: 0;
-            background-color: #f8f9fa !important; /* لون ثابت */
-            z-index: 5;
-            font-weight: bold;
-            border-left: 2px solid var(--border-color);
-            min-width: 180px;
-        }
-
-        /* العمود 2: النوع */
-        .sticky-col-2 {
-            position: sticky;
-            right: 180px; /* يجب أن يساوي عرض العمود 1 */
-            background-color: #fff !important;
-            z-index: 4;
-            min-width: 90px;
-            border-left: 1px solid var(--border-color);
-        }
-
-        /* العمود 3: المقاول (الذي كان يسبب المشكلة) */
-        .sticky-col-3 {
-            position: sticky;
-            right: 270px; /* مجموع عرض العمود 1 + 2 */
-            background-color: #f8f9fa !important;
-            z-index: 5; /* أعلى من الخلايا العادية */
-            min-width: 160px;
-            /* الظل هو الحل السحري للفصل البصري */
-            box-shadow: -5px 0 10px -5px rgba(0,0,0,0.15); 
-            border-left: 1px solid #ccc;
-        }
-        
-        /* تثبيت رؤوس الجدول للأعمدة المثبتة */
         thead th:nth-child(1) { right: 0; z-index: 11; min-width: 180px; }
         thead th:nth-child(2) { right: 180px; z-index: 11; min-width: 90px; }
         thead th:nth-child(3) { right: 270px; z-index: 11; min-width: 160px; box-shadow: -5px 0 10px -5px rgba(0,0,0,0.3); }
 
-
-        /* الحالات */
         .status-ok { color: var(--success); font-size: 20px; }
         .status-late { color: #e74c3c; font-size: 20px; }
         .status-detailed { color: var(--primary-color); font-size: 20px; cursor: help; }
 
-        /* الشارات */
-        .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; color: white; }
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; color: white; }
         .badge-red { background-color: var(--danger); }
         .badge-green { background-color: var(--success); }
 
-        /* أنواع العقود */
         .type-medical { color: var(--primary-color); font-weight: 700; background-color: #eaf4ff !important; }
         .type-non-medical { color: #d35400; font-weight: 700; background-color: #fff4e6 !important; }
-
         .hospital-separator { border-bottom: 2px solid #999 !important; }
 
-        /* --- تأثيرات التعديل --- */
         body.editing-mode .editable:hover { background-color: #f1f8ff; cursor: pointer; }
         body.editing-mode .locked-cell { opacity: 0.6; cursor: not-allowed; background-color: #f0f0f0 !important; }
 
-        /* --- إشعار الحفظ --- */
         #toast {
-            visibility: hidden; min-width: 250px; background-color: #333; color: #fff;
-            text-align: center; border-radius: 50px; padding: 15px; position: fixed; z-index: 2000;
-            left: 50%; bottom: 30px; transform: translateX(-50%); font-size: 15px;
+            visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 50px;
+            padding: 15px; position: fixed; z-index: 2000; left: 50%; bottom: 30px; transform: translateX(-50%);
             box-shadow: 0 5px 15px rgba(0,0,0,0.3); opacity: 0; transition: all 0.5s;
         }
         #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
 
-        /* --- الطباعة --- */
         @media print {
             @page { size: landscape; margin: 5mm; }
             body { background: white; transform: scale(0.65); transform-origin: top right; width: 150%; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .container { box-shadow: none; padding: 0; width: 100% !important; max-width: none !important; }
-            .admin-panel, .btn-print, #loginSection, .filter-section, #toast, .stats-dashboard { display: none !important; }
+            .admin-panel, .btn-print, #loginSection, .toolbar-section, #toast, .dashboard-container { display: none !important; }
             th, td { border: 1px solid #000 !important; font-size: 10px; padding: 2px !important; color: black !important; }
-            /* إجبار الخلفيات في الطباعة */
             .sticky-col-1, .sticky-col-2, .sticky-col-3 { position: static !important; box-shadow: none !important; border: 1px solid #000 !important; }
             .type-medical { background-color: #e3f2fd !important; }
             .type-non-medical { background-color: #fdebd0 !important; }
@@ -247,7 +171,10 @@
                 <span style="font-weight: 800; font-size: 18px;">🔒 بوابة الإدارة</span>
                 <span id="roleDisplay" style="color: #f1c40f; font-weight: bold; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px;"></span>
             </div>
-            <button class="btn-print" onclick="window.print()">🖨 طباعة التقرير</button>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-excel" onclick="exportToExcel()">📊 تصدير Excel</button>
+                <button class="btn-print" onclick="window.print()">🖨 طباعة</button>
+            </div>
         </div>
 
         <div id="loginSection" style="text-align: center; padding: 10px;">
@@ -256,20 +183,18 @@
         </div>
 
         <div id="adminControls" class="admin-controls">
-            <button class="btn-new-month super-admin-only" onclick="addNewMonthAutomatic()">📅 إقفال الشهر (إضافة جديد)</button>
-            <button class="btn-reset super-admin-only" onclick="uploadInitialData()">⚠ تهيئة النظام (Reset)</button>
-            
+            <button class="btn-new-month super-admin-only" onclick="addNewMonthAutomatic()">📅 إقفال الشهر</button>
+            <button class="btn-reset super-admin-only" onclick="uploadInitialData()">⚠ تهيئة النظام</button>
             <button class="btn-logout" onclick="location.reload()">تسجيل خروج</button>
-            
             <div style="width: 100%; font-size:12px; color:#bdc3c7; margin-top:8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
-                💡 نصيحة: انقر مرة واحدة على أي خلية لتعديلها. الحفظ يتم تلقائياً.
+                النظام يحفظ التغييرات تلقائياً.
             </div>
         </div>
     </div>
 
     <header>
         <div class="header-text">
-            <h1>مؤشر استجابة المواقع لرفع مستخلصات الصيانة </h1>
+            <h1>مؤشر استجابة المواقع لرفع مستخلصات الصيانة الطبية</h1>
             <h2>السنة المالية 2024 / 2025</h2>
         </div>
         <div class="logo-container">
@@ -277,47 +202,58 @@
         </div>
     </header>
 
-    <div class="stats-dashboard" id="statsDashboard">
-        <div class="stat-card">
-            <span class="stat-number" id="totalHospitals">0</span>
-            <span class="stat-label">إجمالي المواقع</span>
+    <div class="dashboard-container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-number" id="totalHospitals">0</span>
+                <span class="stat-label">المواقع</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="totalContracts">0</span>
+                <span class="stat-label">العقود النشطة</span>
+            </div>
+            <div class="stat-card red-border">
+                <span class="stat-number" id="totalLate">0</span>
+                <span class="stat-label">المتأخرات الحالية</span>
+            </div>
+            <div class="stat-card" style="border-right-color: #28a745;">
+                <span class="stat-number" id="complianceRate">0%</span>
+                <span class="stat-label">نسبة الالتزام</span>
+            </div>
         </div>
-        <div class="stat-card">
-            <span class="stat-number" id="totalContracts">0</span>
-            <span class="stat-label">إجمالي العقود</span>
-        </div>
-        <div class="stat-card red-border">
-            <span class="stat-number" id="totalLate">0</span>
-            <span class="stat-label">إجمالي المتأخرات الحالية</span>
+        <div class="chart-container">
+            <canvas id="kpiChart"></canvas>
         </div>
     </div>
 
-    <div class="filter-section">
-        <span class="filter-label">🌪 تصفية العرض:</span>
+    <div class="toolbar-section">
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="searchInput" class="search-input" placeholder="بحث عن مستشفى أو مقاول..." onkeyup="applyFilter()">
+        </div>
+        
         <select id="typeFilter" class="filter-select" onchange="applyFilter()">
-            <option value="all">عرض شامل (طبي + غير طبي)</option>
-            <option value="طبي">عقود طبية فقط</option>
-            <option value="غير طبي">عقود غير طبية فقط</option>
+            <option value="all">نوع العقد: الكل</option>
+            <option value="طبي">عقود طبية</option>
+            <option value="غير طبي">عقود غير طبية</option>
         </select>
         
-        <div style="flex-grow: 1;"></div>
-        
-        <div class="legend">
-            <div style="display: flex; align-items: center; gap: 5px;"><span class="status-detailed">✅</span> <span>مكتمل البيانات</span></div>
-            <div style="display: flex; align-items: center; gap: 5px;"><span class="status-ok">✔</span> <span>مرفوع</span></div>
-            <div style="display: flex; align-items: center; gap: 5px;"><span class="status-late">✘</span> <span>متأخر</span></div>
+        <div class="legend" style="display: flex; gap: 15px; font-size: 13px;">
+            <div style="display: flex; align-items: center; gap: 5px;"><span class="status-detailed">✅</span> مكتمل</div>
+            <div style="display: flex; align-items: center; gap: 5px;"><span class="status-ok">✔</span> مرفوع</div>
+            <div style="display: flex; align-items: center; gap: 5px;"><span class="status-late">✘</span> متأخر</div>
         </div>
     </div>
 
-    <div id="loader">جاري الاتصال بقاعدة البيانات...</div>
-    <div id="toast">تم الحفظ بنجاح</div>
+    <div id="loader">جاري الاتصال...</div>
+    <div id="toast">تم الحفظ</div>
 
     <table id="mainTable" style="display:none;">
         <thead><tr id="headerRow"></tr></thead>
         <tbody id="tableBody"></tbody>
     </table>
 
-    <footer> تم البرمجة بواسطة: قسم الصيانة الطبية بتجمع تبوك الصحي</footer>
+    <footer>تم التطوير بواسطة: قسم الصيانة الطبية بتجمع تبوك الصحي</footer>
 </div>
 
 <script type="module">
@@ -339,8 +275,7 @@
     
     window.currentData = { monthNames: [], rows: [] };
     window.userRole = null;
-    window.currentFilter = 'all';
-    
+    let myChart = null; // متغير للرسم البياني
     const emptyMonthData = { status: "✘", letterNum: "", submissionDate: "" };
 
     const dataRef = ref(db, 'kpi_data_v4'); 
@@ -350,7 +285,6 @@
         const table = document.getElementById('mainTable');
         
         if (data && data.rows) {
-            // تنظيف البيانات
             data.rows.forEach(row => {
                 if (row.months && row.months.length > 0 && typeof row.months[0] === 'string') {
                     row.months = row.months.map(s => ({ status: s, letterNum: "", submissionDate: "" }));
@@ -362,16 +296,14 @@
             loader.style.display = 'none';
             table.style.display = 'table';
         } else {
-            loader.innerHTML = "قاعدة البيانات فارغة. يرجى تهيئة النظام.";
+            loader.innerHTML = "النظام جاهز للتهيئة.";
         }
     });
 
     function showToast(message, isSuccess = true) {
         const x = document.getElementById("toast");
-        x.innerText = message;
-        x.style.backgroundColor = isSuccess ? "#333" : "#dc3545";
-        x.className = "show";
-        setTimeout(function(){ x.className = x.className.replace("show", ""); }, 2500);
+        x.innerText = message; x.style.backgroundColor = isSuccess ? "#333" : "#dc3545";
+        x.className = "show"; setTimeout(() => x.className = x.className.replace("show", ""), 2500);
     }
 
     window.saveToFirebase = function() {
@@ -379,150 +311,98 @@
         showToast("جاري الحفظ...", true);
         set(ref(db, 'kpi_data_v4'), window.currentData)
             .then(() => { showToast("تم الحفظ تلقائياً ✅", true); updateDashboard(); })
-            .catch((error) => { showToast("فشل الحفظ ❌", false); });
+            .catch(() => { showToast("فشل الحفظ ❌", false); });
     };
 
+    // --- الرسم البياني وتحديث اللوحة ---
     function updateDashboard() {
         if(!window.currentData.rows) return;
-        const uniqueHospitals = new Set(window.currentData.rows.map(r => r.name)).size;
+        const rows = window.currentData.rows;
+        
+        // الإحصائيات
+        const uniqueHospitals = new Set(rows.map(r => r.name)).size;
+        const totalLate = rows.reduce((sum, row) => sum + (row.late || 0), 0);
+        
+        // حساب إجمالي الخلايا (عدد العقود * عدد الشهور)
+        const totalCells = rows.length * (rows[0]?.months?.length || 0);
+        // حساب إجمالي المرفوع (✔)
+        let totalSubmitted = 0;
+        rows.forEach(r => {
+            r.months.forEach(m => { if(m.status === '✔') totalSubmitted++; });
+        });
+        
+        const compliance = totalCells > 0 ? Math.round((totalSubmitted / totalCells) * 100) : 0;
+
         document.getElementById('totalHospitals').innerText = uniqueHospitals;
-        document.getElementById('totalContracts').innerText = window.currentData.rows.length;
-        const totalLate = window.currentData.rows.reduce((sum, row) => sum + (row.late || 0), 0);
+        document.getElementById('totalContracts').innerText = rows.length;
         document.getElementById('totalLate').innerText = totalLate;
-    }
+        document.getElementById('complianceRate').innerText = compliance + "%";
 
-    // --- الوظائف الإدارية ---
-    window.adminLogin = async function() {
-        const { value: pass } = await Swal.fire({
-            title: 'تسجيل الدخول',
-            input: 'password',
-            inputLabel: 'أدخل كلمة المرور',
-            inputPlaceholder: 'كلمة المرور...',
-            confirmButtonText: 'دخول',
-            confirmButtonColor: '#3498db'
-        });
-
-        if (!pass) return;
-
-        let roleName = "";
-        if (pass === "1234") { window.userRole = 'super'; roleName = "(المدير العام)"; } 
-        else if (pass === "1111") { window.userRole = 'medical'; roleName = "(مشرف طبي)"; } 
-        else if (pass === "2222") { window.userRole = 'non-medical'; roleName = "(مشرف غير طبي)"; } 
-        else { Swal.fire('خطأ', 'كلمة المرور غير صحيحة', 'error'); return; }
-
-        document.body.classList.add('editing-mode');
-        document.getElementById('loginSection').style.display = 'none';
-        document.getElementById('adminControls').style.display = 'flex';
-        document.getElementById('roleDisplay').innerText = roleName;
-
-        const superBtns = document.querySelectorAll('.super-admin-only');
-        superBtns.forEach(btn => {
-            btn.style.display = (window.userRole === 'super') ? 'inline-block' : 'none';
-        });
-
-        renderTable();
-        Swal.fire({
-            icon: 'success',
-            title: 'أهلاً بك',
-            text: `تم تسجيل الدخول بصلاحية: ${roleName}`,
-            timer: 1500,
-            showConfirmButton: false
-        });
-    }
-
-    window.uploadInitialData = async function() {
-        if (!window.userRole || window.userRole !== 'super') return;
+        // الرسم البياني (Doughnut)
+        const ctx = document.getElementById('kpiChart').getContext('2d');
+        const notSubmitted = totalCells - totalSubmitted;
         
-        const result = await Swal.fire({
-            title: 'هل أنت متأكد؟',
-            text: "سيتم مسح جميع البيانات الحالية وإعادة بناء الجدول!",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'نعم، إعادة ضبط',
-            cancelButtonText: 'إلغاء'
-        });
-
-        if (result.isConfirmed) {
-            const hospitals = [
-                "مستشفى ضبا العام", "مستشفى أملج العام", "مستشفى حقل العام", 
-                "مستشفى البدع العام", "مستشفى أشواق العام", "مستشفى تيماء العام", 
-                "مستشفى أبوراكة العام", "مستشفى الملك فهد", "مستشفى الصحة النفسية", 
-                "مستشفى الملك خالد", "مستشفى الولادة والأطفال", "مستشفى الوجه"
-            ];
-            const initialMonths = Array(12).fill().map(() => ({ status: "✔", letterNum: "", submissionDate: "" }));
-            let newRows = [];
-            hospitals.forEach(hosp => {
-                newRows.push({ name: hosp, type: "طبي", cont: "اسم المقاول", late: 0, months: JSON.parse(JSON.stringify(initialMonths)), notes: "" });
-                newRows.push({ name: hosp, type: "غير طبي", cont: "اسم المقاول", late: 0, months: JSON.parse(JSON.stringify(initialMonths)), notes: "" });
-            });
-            const initialData = {
-                monthNames: [
-                    "أكتوبر 25", "سبتمبر 25", "أغسطس 25", "يوليو 25", 
-                    "يونيو 25", "مايو 25", "أبريل 24", "مارس 25", 
-                    "فبراير 25", "يناير 25", "ديسمبر 24", "نوفمبر 24"
-                ],
-                rows: newRows
-            };
-            window.currentData = initialData;
-            window.saveToFirebase();
-        }
-    };
-
-    window.addNewMonthAutomatic = async function() {
-        if (!window.userRole || window.userRole !== 'super') return;
+        if(myChart) myChart.destroy();
         
-        const date = new Date();
-        date.setMonth(date.getMonth() - 1); 
-        const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
-        const prevMonthName = monthsAr[date.getMonth()];
-        const prevYearShort = date.getFullYear().toString().slice(-2);
-        const newColumnTitle = `${prevMonthName} ${prevYearShort}`;
-
-        if (window.currentData.monthNames[0] === newColumnTitle) {
-            Swal.fire('تنبيه', `الشهر "${newColumnTitle}" مضاف بالفعل!`, 'info'); return;
-        }
-
-        const result = await Swal.fire({
-            title: 'إقفال الشهر وإضافة جديد',
-            text: `هل تريد إضافة شهر "${newColumnTitle}" وحذف أقدم شهر؟`,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'نعم، أضف',
-            cancelButtonText: 'إلغاء'
-        });
-
-        if(result.isConfirmed) {
-            window.currentData.monthNames.unshift(newColumnTitle);
-            window.currentData.rows.forEach(row => { 
-                row.months.unshift(JSON.parse(JSON.stringify(emptyMonthData)));
-            });
-            if (window.currentData.monthNames.length > 12) {
-                window.currentData.monthNames.pop();
-                window.currentData.rows.forEach(row => { row.months.pop(); });
+        myChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['مرفوع', 'متأخر'],
+                datasets: [{
+                    data: [totalSubmitted, notSubmitted],
+                    backgroundColor: ['#28a745', '#dc3545'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { font: { family: 'Tajawal' } } }
+                }
             }
-            renderTable();
-            window.saveToFirebase();
-        }
-    };
-
-    function canEdit(rowType) {
-        if (!window.userRole) return false;
-        if (window.userRole === 'super') return true;
-        if (window.userRole === 'medical' && rowType === 'طبي') return true;
-        if (window.userRole === 'non-medical' && rowType === 'غير طبي') return true;
-        return false;
+        });
     }
 
+    // --- تصدير Excel ---
+    window.exportToExcel = function() {
+        const wb = XLSX.utils.book_new();
+        
+        // تجهيز البيانات
+        const headers = ["المستشفى", "نوع العقد", "المقاول", "عدد المتأخرات", ...window.currentData.monthNames, "ملاحظات"];
+        const excelData = [headers];
+
+        window.currentData.rows.forEach(row => {
+            let rowData = [
+                row.name,
+                row.type,
+                row.cont,
+                row.late
+            ];
+            // إضافة حالة الشهور
+            row.months.forEach(m => {
+                let cellVal = m.status === '✔' ? 'تم الرفع' : 'متأخر';
+                if(m.status === '✔' && m.letterNum) cellVal += ` (${m.letterNum})`;
+                rowData.push(cellVal);
+            });
+            rowData.push(row.notes);
+            excelData.push(rowData);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(excelData);
+        XLSX.utils.book_append_sheet(wb, ws, "تقرير الأداء");
+        XLSX.writeFile(wb, "KPI_Report_Tabuk.xlsx");
+    }
+
+    // --- الجدول والفلترة والبحث ---
     window.applyFilter = function() {
-        window.currentFilter = document.getElementById('typeFilter').value;
         renderTable();
     };
 
     window.renderTable = function() {
         const data = window.currentData;
-        const filter = window.currentFilter;
+        const filterType = document.getElementById('typeFilter').value;
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         
         const headerRow = document.getElementById('headerRow');
         headerRow.innerHTML = `
@@ -550,11 +430,16 @@
                 let row = data.rows[i];
                 let nextRow = data.rows[i+1];
                 let isSameHospital = (nextRow && row.name === nextRow.name);
-                const showRow = (filter === 'all' || row.type === filter);
+                
+                // منطق الفلترة والبحث
+                const matchesSearch = row.name.toLowerCase().includes(searchTerm) || row.cont.toLowerCase().includes(searchTerm);
+                const matchesType = (filterType === 'all' || row.type === filterType);
+                const showRow = matchesSearch && matchesType;
                 
                 if (showRow) {
                     const tr1 = document.createElement('tr');
-                    if (filter === 'all' && isSameHospital) {
+                    // الدمج فقط إذا لم يكن هناك بحث نشط أو فلتر
+                    if (filterType === 'all' && searchTerm === '' && isSameHospital) {
                         tr1.innerHTML += `<td rowspan="2" class="sticky-col-1" style="background-color: #fdfdfd; font-weight:bold;">${row.name}</td>`;
                     } else {
                         tr1.innerHTML += `<td class="sticky-col-1">${row.name}</td>`;
@@ -563,14 +448,15 @@
                     tbody.appendChild(tr1);
                     tr1.classList.add("hospital-separator");
 
-                    if (filter === 'all' && isSameHospital) {
+                    if (filterType === 'all' && searchTerm === '' && isSameHospital) {
                         const tr2 = document.createElement('tr');
                         appendRowData(tr2, nextRow, i+1);
                         tr2.classList.add("hospital-separator");
                         tbody.appendChild(tr2);
                     }
                 }
-                if (filter === 'all' && isSameHospital) { i += 2; } else { i++; }
+                // إدارة العداد
+                if (filterType === 'all' && searchTerm === '' && isSameHospital) { i += 2; } else { i++; }
             }
         }
         updateDashboard();
@@ -581,7 +467,6 @@
         const editClass = isEditable ? "editable" : "locked-cell"; 
         let typeClass = row.type === "طبي" ? "type-medical" : "type-non-medical";
         tr.innerHTML += `<td class="sticky-col-2 ${typeClass}">${row.type}</td>`;
-        
         tr.innerHTML += `<td class="sticky-col-3 ${editClass}" ${isEditable ? `onclick="editCell(${rowIndex}, 'cont')"` : ''}>${row.cont}</td>`;
         
         let autoLateCount = row.months.filter(m => m.status === '✘').length;
@@ -598,119 +483,139 @@
             if (statusText === '✔') {
                 statusClass = 'status-ok';
                 if (statusObject.letterNum || statusObject.submissionDate) {
-                    statusClass = 'status-detailed'; 
-                    displayStatus = '✅';
+                    statusClass = 'status-detailed'; displayStatus = '✅';
                     titleText = `رقم الخطاب: ${statusObject.letterNum}\nتاريخ الرفع: ${statusObject.submissionDate}`;
                 } else {
-                    displayStatus = '✔';
-                    titleText = 'مرفوع (بيانات ناقصة)';
+                    displayStatus = '✔'; titleText = 'مرفوع (بيانات ناقصة)';
                 }
             }
-            
-            tr.innerHTML += `<td class="${editClass} ${statusClass}" 
-                                 title="${titleText}"
-                                 onclick="handleMonthClick(${rowIndex}, ${monthIndex}, '${row.type}')">
-                                 ${displayStatus}
-                             </td>`;
+            tr.innerHTML += `<td class="${editClass} ${statusClass}" title="${titleText}" onclick="handleMonthClick(${rowIndex}, ${monthIndex}, '${row.type}')">${displayStatus}</td>`;
         });
 
         tr.innerHTML += `<td class="${editClass} note-text" ${isEditable ? `onclick="editCell(${rowIndex}, 'notes')"` : ''}>${row.notes}</td>`;
     }
 
+    // --- الصلاحيات والوظائف الإدارية ---
+    window.adminLogin = async function() {
+        const { value: pass } = await Swal.fire({
+            title: 'تسجيل الدخول', input: 'password', inputLabel: 'أدخل كلمة المرور',
+            confirmButtonText: 'دخول', confirmButtonColor: '#3498db'
+        });
+        if (!pass) return;
+
+        let roleName = "";
+        if (pass === "1234") { window.userRole = 'super'; roleName = "(المدير العام)"; } 
+        else if (pass === "1111") { window.userRole = 'medical'; roleName = "(مشرف طبي)"; } 
+        else if (pass === "2222") { window.userRole = 'non-medical'; roleName = "(مشرف غير طبي)"; } 
+        else { Swal.fire('خطأ', 'كلمة المرور غير صحيحة', 'error'); return; }
+
+        document.body.classList.add('editing-mode');
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('adminControls').style.display = 'flex';
+        document.getElementById('roleDisplay').innerText = roleName;
+        
+        document.querySelectorAll('.super-admin-only').forEach(btn => 
+            btn.style.display = (window.userRole === 'super') ? 'inline-block' : 'none'
+        );
+        renderTable();
+        Swal.fire({ icon: 'success', title: 'أهلاً بك', text: roleName, timer: 1500, showConfirmButton: false });
+    }
+
+    function canEdit(rowType) {
+        if (!window.userRole) return false;
+        if (window.userRole === 'super') return true;
+        if (window.userRole === 'medical' && rowType === 'طبي') return true;
+        if (window.userRole === 'non-medical' && rowType === 'غير طبي') return true;
+        return false;
+    }
+
+    window.uploadInitialData = async function() {
+        if (!window.userRole || window.userRole !== 'super') return;
+        const result = await Swal.fire({
+            title: 'هل أنت متأكد؟', text: "سيتم مسح جميع البيانات الحالية!",
+            icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'نعم، إعادة ضبط'
+        });
+
+        if (result.isConfirmed) {
+            const hospitals = ["مستشفى ضبا العام", "مستشفى أملج العام", "مستشفى حقل العام", "مستشفى البدع العام", "مستشفى أشواق العام", "مستشفى تيماء العام", "مستشفى أبوراكة العام", "مستشفى الملك فهد", "مستشفى الصحة النفسية", "مستشفى الملك خالد", "مستشفى الولادة والأطفال", "مستشفى الوجه"];
+            const initialMonths = Array(12).fill().map(() => ({ status: "✔", letterNum: "", submissionDate: "" }));
+            let newRows = [];
+            hospitals.forEach(hosp => {
+                newRows.push({ name: hosp, type: "طبي", cont: "اسم المقاول", late: 0, months: JSON.parse(JSON.stringify(initialMonths)), notes: "" });
+                newRows.push({ name: hosp, type: "غير طبي", cont: "اسم المقاول", late: 0, months: JSON.parse(JSON.stringify(initialMonths)), notes: "" });
+            });
+            window.currentData = {
+                monthNames: ["أكتوبر 25", "سبتمبر 25", "أغسطس 25", "يوليو 25", "يونيو 25", "مايو 25", "أبريل 24", "مارس 25", "فبراير 25", "يناير 25", "ديسمبر 24", "نوفمبر 24"],
+                rows: newRows
+            };
+            window.saveToFirebase();
+        }
+    };
+
+    window.addNewMonthAutomatic = async function() {
+        if (!window.userRole || window.userRole !== 'super') return;
+        const date = new Date(); date.setMonth(date.getMonth() - 1); 
+        const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+        const newColumnTitle = `${monthsAr[date.getMonth()]} ${date.getFullYear().toString().slice(-2)}`;
+
+        if (window.currentData.monthNames[0] === newColumnTitle) { Swal.fire('تنبيه', `الشهر "${newColumnTitle}" مضاف بالفعل!`, 'info'); return; }
+
+        const result = await Swal.fire({ title: 'إقفال الشهر', text: `إضافة "${newColumnTitle}" وحذف الأقدم؟`, icon: 'question', showCancelButton: true, confirmButtonText: 'نعم' });
+
+        if(result.isConfirmed) {
+            window.currentData.monthNames.unshift(newColumnTitle);
+            window.currentData.rows.forEach(row => { row.months.unshift(JSON.parse(JSON.stringify(emptyMonthData))); });
+            if (window.currentData.monthNames.length > 12) { window.currentData.monthNames.pop(); window.currentData.rows.forEach(row => row.months.pop()); }
+            renderTable(); window.saveToFirebase();
+        }
+    };
+
     window.handleMonthClick = async function(rowIndex, monthIndex, rowType) {
         if (!canEdit(rowType)) return;
-
         let statusObject = window.currentData.rows[rowIndex].months[monthIndex];
         let monthName = window.currentData.monthNames[monthIndex];
         
         if (statusObject.status === '✘') {
             const { value: formValues } = await Swal.fire({
                 title: `رفع مستخلص: ${monthName}`,
-                html:
-                    '<label style="display:block; text-align:right; margin-bottom:5px;">رقم الخطاب</label>' +
-                    '<input id="swal-input1" class="swal2-input" placeholder="مثال: 1445/203">' +
-                    '<label style="display:block; text-align:right; margin-bottom:5px; margin-top:10px;">تاريخ الرفع</label>' +
-                    '<input id="swal-input2" class="swal2-input" type="date">',
-                focusConfirm: false,
-                confirmButtonText: 'حفظ ورفع ✅',
-                showCancelButton: true,
-                cancelButtonText: 'إلغاء',
-                preConfirm: () => {
-                    return [
-                        document.getElementById('swal-input1').value,
-                        document.getElementById('swal-input2').value
-                    ]
-                }
+                html: '<input id="swal-input1" class="swal2-input" placeholder="رقم الخطاب">' + '<input id="swal-input2" class="swal2-input" type="date">',
+                focusConfirm: false, showCancelButton: true, confirmButtonText: 'حفظ ✅',
+                preConfirm: () => [document.getElementById('swal-input1').value, document.getElementById('swal-input2').value]
             });
-
             if (formValues) {
-                statusObject.status = '✔';
-                statusObject.letterNum = formValues[0] || '';
-                statusObject.submissionDate = formValues[1] || '';
-                renderTable();
-                window.saveToFirebase();
+                statusObject.status = '✔'; statusObject.letterNum = formValues[0]; statusObject.submissionDate = formValues[1];
+                renderTable(); window.saveToFirebase();
             }
-        } 
-        else {
+        } else {
             const result = await Swal.fire({
                 title: `تعديل مستخلص: ${monthName}`,
-                html: `
-                    <div style="text-align:right; font-size:14px; margin-bottom:10px;">
-                        <b>البيانات الحالية:</b><br>
-                        الخطاب: ${statusObject.letterNum || '-'}<br>
-                        التاريخ: ${statusObject.submissionDate || '-'}
-                    </div>
-                `,
-                showDenyButton: true,
-                showCancelButton: true,
-                confirmButtonText: 'تعديل البيانات ✏',
-                denyButtonText: 'حذف (تحويل لمتأخر) 🗑',
-                cancelButtonText: 'إغلاق',
-                confirmButtonColor: '#3085d6',
-                denyButtonColor: '#d33'
+                html: `<b>الخطاب:</b> ${statusObject.letterNum || '-'}<br><b>التاريخ:</b> ${statusObject.submissionDate || '-'}`,
+                showDenyButton: true, showCancelButton: true, confirmButtonText: 'تعديل ✏', denyButtonText: 'حذف 🗑',
             });
-
             if (result.isConfirmed) {
                 const { value: formValues } = await Swal.fire({
                     title: 'تحديث البيانات',
-                    html:
-                        `<input id="swal-edit1" class="swal2-input" placeholder="رقم الخطاب" value="${statusObject.letterNum}">` +
-                        `<input id="swal-edit2" class="swal2-input" type="date" value="${statusObject.submissionDate}">`,
-                    focusConfirm: false,
+                    html: `<input id="swal-edit1" class="swal2-input" value="${statusObject.letterNum}">` + `<input id="swal-edit2" class="swal2-input" type="date" value="${statusObject.submissionDate}">`,
                     preConfirm: () => [document.getElementById('swal-edit1').value, document.getElementById('swal-edit2').value]
                 });
-
-                if (formValues) {
-                    statusObject.letterNum = formValues[0];
-                    statusObject.submissionDate = formValues[1];
-                    renderTable();
-                    window.saveToFirebase();
-                }
+                if (formValues) { statusObject.letterNum = formValues[0]; statusObject.submissionDate = formValues[1]; renderTable(); window.saveToFirebase(); }
             } else if (result.isDenied) {
-                statusObject.status = '✘';
-                statusObject.letterNum = '';
-                statusObject.submissionDate = '';
-                renderTable();
-                window.saveToFirebase();
+                statusObject.status = '✘'; statusObject.letterNum = ''; statusObject.submissionDate = ''; renderTable(); window.saveToFirebase();
             }
         }
     };
 
     window.editHeader = async function(index) {
         if (!window.userRole || window.userRole !== 'super') return;
-        let oldVal = window.currentData.monthNames[index];
-        const { value: newVal } = await Swal.fire({ title: 'تعديل اسم الشهر', input: 'text', inputValue: oldVal, showCancelButton: true, confirmButtonText: 'حفظ' });
+        const { value: newVal } = await Swal.fire({ title: 'تعديل اسم الشهر', input: 'text', inputValue: window.currentData.monthNames[index], showCancelButton: true });
         if (newVal) { window.currentData.monthNames[index] = newVal; renderTable(); window.saveToFirebase(); }
     };
 
     window.editCell = async function(rowIndex, field) {
-        let rowType = window.currentData.rows[rowIndex].type;
-        if (!canEdit(rowType)) return;
-        let oldVal = window.currentData.rows[rowIndex][field];
-        const { value: newVal } = await Swal.fire({ title: 'تعديل القيمة', input: 'text', inputValue: oldVal, showCancelButton: true, confirmButtonText: 'حفظ', cancelButtonText: 'إلغاء' });
+        if (!canEdit(window.currentData.rows[rowIndex].type)) return;
+        const { value: newVal } = await Swal.fire({ title: 'تعديل القيمة', input: 'text', inputValue: window.currentData.rows[rowIndex][field], showCancelButton: true });
         if (newVal !== undefined) { window.currentData.rows[rowIndex][field] = newVal; renderTable(); window.saveToFirebase(); }
     };
 </script>
-
 </body>
 </html>
