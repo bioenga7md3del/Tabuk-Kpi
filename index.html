@@ -149,7 +149,6 @@
 
         .status-ok { color: #28a745; font-weight: bold; font-size: 18px; }
         .status-late { color: #dc3545; font-weight: bold; font-size: 18px; }
-        /* أيقونة التفاصيل */
         .status-detailed { color: #0056b3; font-weight: bold; font-size: 18px; } 
 
         .badge {
@@ -196,7 +195,6 @@
             .type-non-medical { background-color: #fdebd0 !important; }
             .locked-cell { opacity: 1 !important; background: none !important; }
             
-            /* إظهار بيانات الخطاب تحت رمز التأكيد (للطباعة) */
             td[title]:after {
                 content: attr(title);
                 display: block;
@@ -233,7 +231,7 @@
             <button class="btn-logout" onclick="location.reload()">خروج</button>
             
             <div style="width: 100%; font-size:12px; color:#bdc3c7; margin-top:5px;">
-                اضغط مرتين (Double Click) على الخلية لرفع/إلغاء المستخلص وإدخال البيانات.
+                تم التحديث: اضغط مرة واحدة فقط على الخلية لتعديل الحالة أو البيانات.
             </div>
         </div>
     </div>
@@ -300,13 +298,7 @@
     window.userRole = null;
     window.currentFilter = 'all';
     
-    // تعريف الهيكل الجديد لبيانات الشهر
-    const emptyMonthData = {
-        status: "✘",
-        letterNum: "",
-        submissionDate: ""
-    };
-
+    const emptyMonthData = { status: "✘", letterNum: "", submissionDate: "" };
 
     const dataRef = ref(db, 'kpi_data_v4'); 
     onValue(dataRef, (snapshot) => {
@@ -315,17 +307,13 @@
         const table = document.getElementById('mainTable');
         
         if (data && data.rows) {
-            // معالجة البيانات القديمة إذا كانت لا تزال على شكل نص
             data.rows.forEach(row => {
                 if (row.months && row.months.length > 0 && typeof row.months[0] === 'string') {
                     row.months = row.months.map(s => ({
-                        status: s,
-                        letterNum: "",
-                        submissionDate: ""
+                        status: s, letterNum: "", submissionDate: ""
                     }));
                 }
             });
-            
             window.currentData = data;
             renderTable();
             loader.style.display = 'none';
@@ -354,18 +342,12 @@
                 "مستشفى أبوراكة العام", "مستشفى الملك فهد", "مستشفى الصحة النفسية", 
                 "مستشفى الملك خالد", "مستشفى الولادة والأطفال", "مستشفى الوجه"
             ];
-            
-            // بناء 12 كائناً شهرياً بالحالة الافتراضية "✔"
-            const initialMonths = Array(12).fill().map(() => ({ 
-                status: "✔", letterNum: "", submissionDate: "" 
-            }));
-
+            const initialMonths = Array(12).fill().map(() => ({ status: "✔", letterNum: "", submissionDate: "" }));
             let newRows = [];
             hospitals.forEach(hosp => {
                 newRows.push({ name: hosp, type: "طبي", cont: "اسم المقاول", late: 0, months: JSON.parse(JSON.stringify(initialMonths)), notes: "" });
                 newRows.push({ name: hosp, type: "غير طبي", cont: "اسم المقاول", late: 0, months: JSON.parse(JSON.stringify(initialMonths)), notes: "" });
             });
-
             const initialData = {
                 monthNames: [
                     "أكتوبر 25", "سبتمبر 25", "أغسطس 25", "يوليو 25", 
@@ -374,7 +356,6 @@
                 ],
                 rows: newRows
             };
-            
             window.currentData = initialData;
             window.saveToFirebase();
         }
@@ -415,20 +396,13 @@
 </script>
 
 <script>
-    // --- منطق الصلاحيات ---
     function adminLogin() {
         const pass = prompt("الرجاء إدخال كلمة المرور:");
         let roleName = "";
-        
-        if (pass === "1234") {
-            window.userRole = 'super'; roleName = "(مدير عام)";
-        } else if (pass === "1111") {
-            window.userRole = 'medical'; roleName = "(أدمن طبي)";
-        } else if (pass === "2222") {
-            window.userRole = 'non-medical'; roleName = "(أدمن غير طبي)";
-        } else {
-            alert("كلمة المرور خاطئة"); return;
-        }
+        if (pass === "1234") { window.userRole = 'super'; roleName = "(مدير عام)"; } 
+        else if (pass === "1111") { window.userRole = 'medical'; roleName = "(أدمن طبي)"; } 
+        else if (pass === "2222") { window.userRole = 'non-medical'; roleName = "(أدمن غير طبي)"; } 
+        else { alert("كلمة المرور خاطئة"); return; }
 
         document.body.classList.add('editing-mode');
         document.getElementById('loginSection').style.display = 'none';
@@ -451,7 +425,6 @@
         return false;
     }
 
-    // --- منطق الجدول ---
     window.applyFilter = function() {
         window.currentFilter = document.getElementById('typeFilter').value;
         renderTable();
@@ -487,13 +460,10 @@
                 let row = data.rows[i];
                 let nextRow = data.rows[i+1];
                 let isSameHospital = (nextRow && row.name === nextRow.name);
-                
-                // تحديد ما إذا كان يجب عرض الصف في حالة الفلترة
                 const showRow = (filter === 'all' || row.type === filter);
                 
                 if (showRow) {
                     const tr1 = document.createElement('tr');
-                    
                     if (filter === 'all' && isSameHospital) {
                         tr1.innerHTML += `<td rowspan="2" class="sticky-col-1" style="background-color: #fcfcfc;">${row.name}</td>`;
                     } else {
@@ -501,7 +471,7 @@
                     }
                     appendRowData(tr1, row, i);
                     tbody.appendChild(tr1);
-                    tr1.classList.add("hospital-separator"); // نضع الفاصل بعد الصف
+                    tr1.classList.add("hospital-separator");
 
                     if (filter === 'all' && isSameHospital) {
                         const tr2 = document.createElement('tr');
@@ -510,12 +480,7 @@
                         tbody.appendChild(tr2);
                     }
                 }
-
-                if (filter === 'all' && isSameHospital) {
-                    i += 2;
-                } else {
-                    i++;
-                }
+                if (filter === 'all' && isSameHospital) { i += 2; } else { i++; }
             }
         }
     }
@@ -523,20 +488,16 @@
     function appendRowData(tr, row, rowIndex) {
         const isEditable = canEdit(row.type);
         const editClass = isEditable ? "editable" : "locked-cell"; 
-
         let typeClass = row.type === "طبي" ? "type-medical" : "type-non-medical";
         tr.innerHTML += `<td class="sticky-col-2 ${typeClass}">${row.type}</td>`;
         
-        // المقاول
         tr.innerHTML += `<td class="sticky-col-3 ${editClass}" ${isEditable ? `onclick="editCell(${rowIndex}, 'cont')"` : ''}>${row.cont}</td>`;
         
-        // المتأخرة
-        let autoLateCount = row.months.filter(m => m.status === '✘').length; // التعديل هنا: نتحقق من status داخل الكائن
+        let autoLateCount = row.months.filter(m => m.status === '✘').length;
         row.late = autoLateCount;
         let badgeClass = row.late > 0 ? 'badge-red' : 'badge-green';
         tr.innerHTML += `<td><span class="badge ${badgeClass}">${row.late}</span></td>`;
 
-        // الشهور
         row.months.forEach((statusObject, monthIndex) => {
             let statusText = statusObject.status;
             let titleText = '';
@@ -546,30 +507,68 @@
             if (statusText === '✔') {
                 statusClass = 'status-ok';
                 if (statusObject.letterNum || statusObject.submissionDate) {
-                    statusClass = 'status-detailed'; // أيقونة مختلفة لوجود بيانات
+                    statusClass = 'status-detailed'; 
                     displayStatus = '✅';
-                    titleText = `رقم الخطاب: ${statusObject.letterNum || 'غير مدخل'}\nتاريخ الرفع: ${statusObject.submissionDate || 'غير مدخل'}`;
+                    titleText = `رقم الخطاب: ${statusObject.letterNum}\nتاريخ الرفع: ${statusObject.submissionDate}`;
                 } else {
                     displayStatus = '✔';
-                    titleText = 'تم الرفع بدون بيانات الخطاب';
+                    titleText = 'تم الرفع بدون بيانات خطاب';
                 }
             }
             
-            // إضافة خاصية title لعرض التفاصيل عند المرور بالفأرة
+            // استخدام handleMonthClick فقط (ضغطة واحدة)
             tr.innerHTML += `<td class="${editClass} ${statusClass}" 
                                  title="${titleText}"
-                                 ondblclick="toggleStatus(${rowIndex}, ${monthIndex}, '${row.type}')"
-                                 onclick="editMonthDetails(${rowIndex}, ${monthIndex}, '${row.type}')">
+                                 onclick="handleMonthClick(${rowIndex}, ${monthIndex}, '${row.type}')">
                                  ${displayStatus}
                              </td>`;
         });
 
-        // الملاحظات
         tr.innerHTML += `<td class="${editClass} note-text" ${isEditable ? `onclick="editCell(${rowIndex}, 'notes')"` : ''}>${row.notes}</td>`;
     }
 
-    // --- وظائف التعديل الجديدة والمعدلة ---
-    
+    // --- الوظيفة الموحدة للنقر (Smart Single Click) ---
+    window.handleMonthClick = function(rowIndex, monthIndex, rowType) {
+        if (!canEdit(rowType)) return;
+
+        let statusObject = window.currentData.rows[rowIndex].months[monthIndex];
+        
+        // الحالة 1: إذا كان متأخر (خطأ) -> نحوله لصح ونطلب البيانات
+        if (statusObject.status === '✘') {
+            let num = prompt("ادخال جديد: أدخل رقم الخطاب المالي:");
+            if (num === null) return; // إلغاء
+            
+            let date = prompt("ادخال جديد: أدخل تاريخ رفع الخطاب (مثال: 05-11-2025):");
+            if (date === null) return; // إلغاء
+
+            statusObject.status = '✔';
+            statusObject.letterNum = num.trim() || '';
+            statusObject.submissionDate = date.trim() || '';
+            renderTable();
+        } 
+        // الحالة 2: إذا كان مرفوع (صح) -> نسأل هل يريد التعديل أم الحذف
+        else {
+            if (confirm("المستخلص مرفوع حالياً ✅\n\n- اضغط (موافق) لحذف المستخلص وتحويله لمتأخر.\n- اضغط (إلغاء) لتعديل رقم الخطاب والتاريخ.")) {
+                // المستخدم ضغط موافق -> حذف
+                statusObject.status = '✘';
+                statusObject.letterNum = '';
+                statusObject.submissionDate = '';
+                renderTable();
+            } else {
+                // المستخدم ضغط إلغاء -> تعديل البيانات
+                let num = prompt("تعديل رقم الخطاب:", statusObject.letterNum);
+                if (num === null) return;
+                
+                let date = prompt("تعديل التاريخ:", statusObject.submissionDate);
+                if (date === null) return;
+
+                statusObject.letterNum = num.trim();
+                statusObject.submissionDate = date.trim();
+                renderTable();
+            }
+        }
+    };
+
     window.editHeader = function(index) {
         if (!window.userRole || window.userRole !== 'super') return;
         let oldVal = window.currentData.monthNames[index];
@@ -592,51 +591,6 @@
         }
     };
 
-    window.toggleStatus = function(rowIndex, monthIndex, rowType) {
-        if (!canEdit(rowType)) return;
-
-        let statusObject = window.currentData.rows[rowIndex].months[monthIndex];
-        
-        if (statusObject.status === '✔') {
-            if (confirm("هل تريد إلغاء حالة الرفع ومسح بيانات الخطاب؟")) {
-                statusObject.status = '✘';
-                statusObject.letterNum = '';
-                statusObject.submissionDate = '';
-                renderTable();
-            }
-        } else {
-            // If changing from X to V, prompt for details
-            let num = prompt("أدخل رقم الخطاب المالي (مطلوب):");
-            if (num === null) return;
-            let date = prompt("أدخل تاريخ رفع الخطاب للمالية (مثال: 2025-11-05):");
-            if (date === null) return;
-
-            statusObject.status = '✔';
-            statusObject.letterNum = num.trim() || 'غير مدخل';
-            statusObject.submissionDate = date.trim() || 'غير مدخل';
-            renderTable();
-        }
-    };
-    
-    window.editMonthDetails = function(rowIndex, monthIndex, rowType) {
-        if (!canEdit(rowType)) return;
-        
-        let statusObject = window.currentData.rows[rowIndex].months[monthIndex];
-        if (statusObject.status !== '✔') {
-            alert("الرجاء الضغط مرتين أولاً لرفع المستخلص (✔) ومن ثم إدخال البيانات.");
-            return;
-        }
-
-        let num = prompt(`تعديل رقم الخطاب الحالي: (${statusObject.letterNum || 'غير مدخل'})`);
-        if (num === null) return;
-        
-        let date = prompt(`تعديل تاريخ الرفع الحالي: (${statusObject.submissionDate || 'غير مدخل'})`);
-        if (date === null) return;
-
-        statusObject.letterNum = num.trim() || 'غير مدخل';
-        statusObject.submissionDate = date.trim() || 'غير مدخل';
-        renderTable();
-    };
 </script>
 
 </body>
