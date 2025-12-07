@@ -7,7 +7,11 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script> <style>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
         :root {
             --primary-color: #0056b3;
             --secondary-color: #2c3e50;
@@ -25,7 +29,6 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.08); border-radius: 15px; overflow-x: auto;
         }
 
-        /* --- الهيدر --- */
         header {
             display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px;
             border-bottom: 4px solid var(--primary-color); padding-bottom: 15px;
@@ -34,7 +37,6 @@
         .header-text h2 { color: #666; margin: 5px 0 0 0; font-size: 15px; }
         .logo-container img { max-height: 100px; width: auto; }
 
-        /* --- لوحة الإحصائيات والرسم البياني --- */
         .dashboard-container {
             display: flex; gap: 20px; margin-bottom: 25px; align-items: stretch;
         }
@@ -53,14 +55,16 @@
             background: linear-gradient(135deg, #ffffff 0%, #f9f9f9 100%);
             padding: 15px; border-radius: 10px; border-right: 4px solid var(--primary-color);
             box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center;
-            display: flex; flex-direction: column; justify-content: center;
+            display: flex; flex-direction: column; justify-content: center; transition: all 0.3s ease;
         }
+        /* إضافة حركة بسيطة عند التحديث */
+        .stat-card:hover { transform: translateY(-2px); }
+        
         .stat-number { font-size: 28px; font-weight: 800; color: var(--primary-color); }
         .stat-label { font-size: 13px; color: #666; font-weight: bold; margin-top: 5px; }
         .stat-card.red-border { border-right-color: var(--danger); }
         .stat-card.red-border .stat-number { color: var(--danger); }
 
-        /* --- أدوات التحكم --- */
         .admin-panel {
             background: var(--secondary-color); color: white; padding: 15px 20px;
             border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(44, 62, 80, 0.3);
@@ -83,7 +87,6 @@
         .btn-print { background: #fff; color: var(--secondary-color); }
         .super-admin-only { display: none; } 
 
-        /* --- شريط الأدوات والفلتر --- */
         .toolbar-section {
             display: flex; align-items: center; background-color: #fff; padding: 10px 15px;
             border-radius: 10px; margin-bottom: 15px; border: 1px solid #e1e4e8; gap: 15px; flex-wrap: wrap;
@@ -100,7 +103,6 @@
 
         .filter-select { padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-family: 'Tajawal'; font-size: 14px; }
 
-        /* --- الجدول --- */
         table {
             width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1400px;
             border: 1px solid var(--border-color); border-radius: 8px;
@@ -117,7 +119,6 @@
             background-color: #fff; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color);
         }
 
-        /* تثبيت الأعمدة */
         .sticky-col-1 { position: sticky; right: 0; background-color: #f8f9fa !important; z-index: 5; font-weight: bold; border-left: 2px solid var(--border-color); min-width: 180px; }
         .sticky-col-2 { position: sticky; right: 180px; background-color: #fff !important; z-index: 4; min-width: 90px; border-left: 1px solid var(--border-color); }
         .sticky-col-3 { position: sticky; right: 270px; background-color: #f8f9fa !important; z-index: 5; min-width: 160px; box-shadow: -5px 0 10px -5px rgba(0,0,0,0.15); border-left: 1px solid #ccc; }
@@ -210,7 +211,7 @@
             </div>
             <div class="stat-card">
                 <span class="stat-number" id="totalContracts">0</span>
-                <span class="stat-label">العقود النشطة</span>
+                <span class="stat-label">العقود المعروضة</span>
             </div>
             <div class="stat-card red-border">
                 <span class="stat-number" id="totalLate">0</span>
@@ -275,7 +276,7 @@
     
     window.currentData = { monthNames: [], rows: [] };
     window.userRole = null;
-    let myChart = null; // متغير للرسم البياني
+    let myChart = null;
     const emptyMonthData = { status: "✘", letterNum: "", submissionDate: "" };
 
     const dataRef = ref(db, 'kpi_data_v4'); 
@@ -292,7 +293,7 @@
             });
             window.currentData = data;
             renderTable();
-            updateDashboard();
+            // تم إزالة updateDashboard من هنا لأن renderTable تستدعيها بالفعل
             loader.style.display = 'none';
             table.style.display = 'table';
         } else {
@@ -311,21 +312,26 @@
         showToast("جاري الحفظ...", true);
         set(ref(db, 'kpi_data_v4'), window.currentData)
             .then(() => { showToast("تم الحفظ تلقائياً ✅", true); updateDashboard(); })
-            .catch(() => { showToast("فشل الحفظ ❌", false); });
+            .catch((error) => { showToast("فشل الحفظ ❌", false); });
     };
 
-    // --- الرسم البياني وتحديث اللوحة ---
+    // --- تحديث لوحة الإحصائيات (معدلة للفلتر) ---
     function updateDashboard() {
         if(!window.currentData.rows) return;
-        const rows = window.currentData.rows;
         
-        // الإحصائيات
+        // جلب الفلتر الحالي لتطبيقه على الإحصائيات
+        const filter = document.getElementById('typeFilter').value;
+        
+        // تصفية الصفوف أولاً
+        const rows = window.currentData.rows.filter(row => {
+            return filter === 'all' || row.type === filter;
+        });
+        
+        // الإحصائيات بناءً على البيانات المصفاة
         const uniqueHospitals = new Set(rows.map(r => r.name)).size;
         const totalLate = rows.reduce((sum, row) => sum + (row.late || 0), 0);
         
-        // حساب إجمالي الخلايا (عدد العقود * عدد الشهور)
         const totalCells = rows.length * (rows[0]?.months?.length || 0);
-        // حساب إجمالي المرفوع (✔)
         let totalSubmitted = 0;
         rows.forEach(r => {
             r.months.forEach(m => { if(m.status === '✔') totalSubmitted++; });
@@ -338,7 +344,7 @@
         document.getElementById('totalLate').innerText = totalLate;
         document.getElementById('complianceRate').innerText = compliance + "%";
 
-        // الرسم البياني (Doughnut)
+        // تحديث الرسم البياني
         const ctx = document.getElementById('kpiChart').getContext('2d');
         const notSubmitted = totalCells - totalSubmitted;
         
@@ -367,19 +373,15 @@
     // --- تصدير Excel ---
     window.exportToExcel = function() {
         const wb = XLSX.utils.book_new();
-        
-        // تجهيز البيانات
         const headers = ["المستشفى", "نوع العقد", "المقاول", "عدد المتأخرات", ...window.currentData.monthNames, "ملاحظات"];
         const excelData = [headers];
 
-        window.currentData.rows.forEach(row => {
-            let rowData = [
-                row.name,
-                row.type,
-                row.cont,
-                row.late
-            ];
-            // إضافة حالة الشهور
+        // نستخدم نفس الفلتر الحالي عند التصدير أيضاً
+        const filter = document.getElementById('typeFilter').value;
+        const rowsToExport = window.currentData.rows.filter(row => filter === 'all' || row.type === filter);
+
+        rowsToExport.forEach(row => {
+            let rowData = [row.name, row.type, row.cont, row.late];
             row.months.forEach(m => {
                 let cellVal = m.status === '✔' ? 'تم الرفع' : 'متأخر';
                 if(m.status === '✔' && m.letterNum) cellVal += ` (${m.letterNum})`;
@@ -431,14 +433,12 @@
                 let nextRow = data.rows[i+1];
                 let isSameHospital = (nextRow && row.name === nextRow.name);
                 
-                // منطق الفلترة والبحث
                 const matchesSearch = row.name.toLowerCase().includes(searchTerm) || row.cont.toLowerCase().includes(searchTerm);
                 const matchesType = (filterType === 'all' || row.type === filterType);
                 const showRow = matchesSearch && matchesType;
                 
                 if (showRow) {
                     const tr1 = document.createElement('tr');
-                    // الدمج فقط إذا لم يكن هناك بحث نشط أو فلتر
                     if (filterType === 'all' && searchTerm === '' && isSameHospital) {
                         tr1.innerHTML += `<td rowspan="2" class="sticky-col-1" style="background-color: #fdfdfd; font-weight:bold;">${row.name}</td>`;
                     } else {
@@ -455,10 +455,10 @@
                         tbody.appendChild(tr2);
                     }
                 }
-                // إدارة العداد
                 if (filterType === 'all' && searchTerm === '' && isSameHospital) { i += 2; } else { i++; }
             }
         }
+        // تحديث الداشبورد بعد رسم الجدول
         updateDashboard();
     }
 
