@@ -1,9 +1,9 @@
-// --- تهيئة التلميح العائم ---
+// --- تهيئة التلميح ---
 export function initTooltip() {
     if (!document.getElementById('global-tooltip')) {
         const div = document.createElement('div');
         div.id = 'global-tooltip';
-        div.style.cssText = "position:fixed; background:rgba(44,62,80,0.95); color:#fff; padding:10px 15px; border-radius:8px; font-size:12px; z-index:9999; pointer-events:none; display:none; white-space:pre-line; box-shadow:0 4px 15px rgba(0,0,0,0.3);";
+        div.style.cssText = "position:fixed; background:rgba(44,62,80,0.95); color:#fff; padding:10px 15px; border-radius:8px; font-size:12px; z-index:9999; pointer-events:none; display:none; white-space:pre-line; box-shadow:0 4px 15px rgba(0,0,0,0.3); text-align:right;";
         document.body.appendChild(div);
     }
 }
@@ -25,7 +25,19 @@ export function hideTooltip() {
     if (t) t.style.display = 'none';
 }
 
-// --- رسم الجدول الرئيسي ---
+// --- دالة مساعدة لحساب حالة العقد ---
+function getContractStatus(start, end) {
+    if(!start || !end) return { text: "غير محدد", badge: "badge-grey", color: "#7f8c8d" };
+    const today = new Date();
+    const sDate = new Date(start);
+    const eDate = new Date(end);
+    
+    if (today < sDate) return { text: "لم يبدأ", badge: "badge-orange", color: "#f39c12" };
+    if (today > eDate) return { text: "منتهي", badge: "badge-red", color: "#c0392b" };
+    return { text: "ساري", badge: "badge-green", color: "#27ae60" };
+}
+
+// --- رسم الجدول ---
 export function renderTable(appData, userRole, canEditFunc) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
@@ -37,7 +49,7 @@ export function renderTable(appData, userRole, canEditFunc) {
     if (!tbody || !hRow) return;
 
     // Header
-    let hHTML = `<th class="sticky-col-1">الموقع</th><th class="sticky-col-2">النوع</th><th class="sticky-col-3">المقاول</th><th style="min-width:40px">تأخير</th>`;
+    let hHTML = `<th class="sticky-col-1">اسم العقد</th><th class="sticky-col-2">النوع</th><th class="sticky-col-3">المقاول</th><th style="min-width:40px">تأخير</th>`;
     if (monthNames.length) monthNames.forEach(m => hHTML += `<th style="min-width:100px">${m}</th>`);
     else hHTML += `<th>-</th>`;
     hHTML += `<th style="min-width:150px">ملاحظات</th>`;
@@ -54,24 +66,31 @@ export function renderTable(appData, userRole, canEditFunc) {
 
     const filtered = rows.filter(r => {
         const cName = contractors[r.contractorId]?.name || "";
-        return (r.hospital||"").toLowerCase().includes(sHosp) && 
+        const cTitle = r.contractName || r.hospital || ""; // دعم الاسم الجديد والقديم
+        return (cTitle).toLowerCase().includes(sHosp) && 
                cName.toLowerCase().includes(sCont) && 
                (filter === 'all' || r.type === filter);
     });
 
     filtered.forEach(row => {
         const cName = contractors[row.contractorId]?.name || "غير معروف";
+        const cTitle = row.contractName || row.hospital || "بدون اسم";
         const late = (row.months||[]).filter(m => m && m.financeStatus === 'late').length;
         const badge = late > 0 ? 'badge-red' : 'badge-green';
         
         let valFmt = row.value ? Number(row.value).toLocaleString() : '-';
-        const tip = `📄 رقم العقد: ${row.contractNumber||'-'}\n💰 القيمة: ${valFmt} ريال\n📅 البداية: ${row.startDate||'-'}\n📅 النهاية: ${row.endDate||'-'}`;
+        const st = getContractStatus(row.startDate, row.endDate);
+
+        const tip = `📄 رقم العقد: ${row.contractNumber||'-'}\n💰 القيمة: ${valFmt} ريال\n⏳ المدة: ${row.duration||'-'}\n📅 البداية: ${row.startDate||'-'}\n📅 النهاية: ${row.endDate||'-'}\n📊 الحالة: ${st.text}`;
 
         const tr = document.createElement('tr');
         tr.className = row.type === 'طبي' ? 'row-medical' : 'row-non-medical';
         
         tr.innerHTML = `
-            <td class="sticky-col-1">${row.hospital}</td>
+            <td class="sticky-col-1">
+                ${cTitle} 
+                <span class="badge ${st.badge}" style="font-size:9px; margin-right:5px;">${st.text}</span>
+            </td>
             <td class="sticky-col-2" onmousemove="window.showTooltip(event, '${tip.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()" style="cursor:help">
                 <span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span>
             </td>
@@ -83,14 +102,15 @@ export function renderTable(appData, userRole, canEditFunc) {
             monthNames.forEach((m, idx) => {
                 const md = (row.months && row.months[idx]) ? row.months[idx] : {financeStatus:'late'};
                 let ic='✘', cl='status-late', ti='لم يرفع';
-                if(md.financeStatus === 'sent') { ic='✅'; cl='status-ok'; ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}`; }
+                if(md.financeStatus === 'sent') { ic='✅'; cl='status-ok'; ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}\nتاريخ: ${md.submissionDate||'-'}`; }
                 else if(md.financeStatus === 'returned') { ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}`; }
                 
-                // Click Event
                 const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${idx})"` : '';
                 const cursor = canEditFunc(userRole, row.type) ? 'pointer' : 'default';
 
-                tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}" ${clickAttr} onmousemove="window.showTooltip(event, '${ti.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()">${ic}</td>`;
+                tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}">
+                    <div ${clickAttr} onmousemove="window.showTooltip(event, '${ti.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()">${ic}</div>
+                </td>`;
             });
         } else { tr.innerHTML += `<td>-</td>`; }
 
@@ -99,7 +119,7 @@ export function renderTable(appData, userRole, canEditFunc) {
         tbody.appendChild(tr);
     });
 
-    return filtered; // Return for stats
+    return filtered;
 }
 
 // --- رسم البطاقات الإدارية ---
@@ -111,11 +131,18 @@ export function renderCards(appData, type) {
     if (type === 'contract') {
         Object.entries(appData.contracts).forEach(([id, row]) => {
             const cName = appData.contractors[row.contractorId]?.name || "-";
+            const st = getContractStatus(row.startDate, row.endDate);
+            const name = row.contractName || row.hospital;
+
             const div = document.createElement('div'); div.className = 'data-card';
             div.innerHTML = `
-                <div class="card-header"><div><div class="card-title">${row.hospital}</div><div style="font-size:11px;color:#777">${row.contractNumber||'-'}</div></div><span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span></div>
+                <div class="card-header">
+                    <div><div class="card-title">${name}</div><span class="badge ${st.badge}" style="font-size:10px">${st.text}</span></div>
+                    <span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span>
+                </div>
                 <div class="card-body">
                     <div class="row"><span>المقاول:</span><b>${cName}</b></div>
+                    <div class="row"><span>المدة:</span><b>${row.duration||'-'}</b></div>
                     <div class="row"><span>النهاية:</span><b>${row.endDate||'-'}</b></div>
                 </div>
                 <div class="card-actions"><button class="btn-primary" onclick="window.prepareEditContract('${id}')">تعديل</button><button class="btn-danger" onclick="window.deleteContract('${id}')">حذف</button></div>
@@ -133,25 +160,44 @@ export function renderCards(appData, type) {
 
 // --- تحديث الإحصائيات ---
 export function updateStats(rows, appData) {
-    if (!rows) return;
-    const totalLate = rows.reduce((s, r) => s + ((r.months||[]).filter(m => m && m.financeStatus === 'late').length), 0);
-    const totalCells = rows.length * (appData.monthNames.length || 1);
-    let totalSubmitted = 0;
-    rows.forEach(r => (r.months||[]).forEach(m => { if(m && m.financeStatus === 'sent') totalSubmitted++; }));
-    
-    document.getElementById('countHospitals').innerText = new Set(rows.map(r=>r.hospital)).size;
-    document.getElementById('countContracts').innerText = rows.length;
-    document.getElementById('countLate').innerText = totalLate;
-    document.getElementById('complianceRate').innerText = totalCells > 0 ? Math.round((totalSubmitted/totalCells)*100)+'%' : '0%';
+    // التأكد من وجود البيانات لتجنب الخطأ
+    if (!rows || !appData) return;
 
-    const ctx = document.getElementById('kpiChart')?.getContext('2d');
-    if (ctx) {
+    // حساب الإحصائيات بأمان
+    const totalLate = rows.reduce((s, r) => s + ((r.months||[]).filter(m => m && m.financeStatus === 'late').length), 0);
+    const totalCells = rows.length * (appData.monthNames ? appData.monthNames.length : 1);
+    let totalSubmitted = 0;
+    let active = 0, expired = 0;
+
+    rows.forEach(r => {
+        // حساب حالة العقد
+        const st = getContractStatus(r.startDate, r.endDate);
+        if(st.text === 'ساري') active++;
+        if(st.text === 'منتهي') expired++;
+
+        (r.months||[]).forEach(m => { if(m && m.financeStatus === 'sent') totalSubmitted++; });
+    });
+    
+    // تحديث العناصر في الـ HTML (فحص الوجود أولاً)
+    const elHosp = document.getElementById('countHospitals'); if(elHosp) elHosp.innerText = new Set(rows.map(r=>r.hospital)).size;
+    const elCont = document.getElementById('countContracts'); if(elCont) elCont.innerText = rows.length;
+    const elLate = document.getElementById('countLate'); if(elLate) elLate.innerText = totalLate;
+    const elActive = document.getElementById('countActive'); if(elActive) elActive.innerText = active;
+    const elExpired = document.getElementById('countExpired'); if(elExpired) elExpired.innerText = expired;
+    
+    const elComp = document.getElementById('complianceRate'); 
+    if(elComp) elComp.innerText = totalCells > 0 ? Math.round((totalSubmitted/totalCells)*100)+'%' : '0%';
+
+    // تحديث الشارت
+    const canvas = document.getElementById('kpiChart');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
         if(window.myChart) window.myChart.destroy();
         window.myChart = new Chart(ctx, { type: 'doughnut', data: { labels:['مرفوع','متأخر'], datasets:[{data:[totalSubmitted, totalCells-totalSubmitted], backgroundColor:['#27ae60','#c0392b']}] }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
     }
 }
 
 export function showToast(msg) {
-    const t = document.getElementById("toast"); t.innerText = msg; t.className = "show"; setTimeout(() => t.className = "", 2500);
+    const t = document.getElementById("toast"); if(t) { t.innerText = msg; t.className = "show"; setTimeout(() => t.className = "", 2500); }
 }
-export function toggleModal(id, show) { document.getElementById(id).style.display = show ? 'flex' : 'none'; }
+export function toggleModal(id, show) { const m = document.getElementById(id); if(m) m.style.display = show ? 'flex' : 'none'; }
