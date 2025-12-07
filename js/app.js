@@ -18,13 +18,17 @@ onValue(dbRef, (snapshot) => {
         window.appData.contracts = data.contracts || {};
         window.appData.monthNames = data.monthNames || [];
         
-        renderTable();
-        updateStats();
-        
-        if (loader) loader.style.display = 'none';
-        if (table) table.style.display = 'table';
+        try {
+            renderTable();
+            updateStats();
+            if (loader) loader.style.display = 'none';
+            if (table) table.style.display = 'table';
+        } catch (e) {
+            console.error("خطأ في العرض:", e);
+            if (loader) loader.innerHTML = "حدث خطأ في عرض البيانات. يرجى تهيئة النظام.";
+        }
     } else {
-        if (loader) loader.innerHTML = "النظام جاهز. الرجاء تسجيل الدخول وتهيئة النظام.";
+        if (loader) loader.innerHTML = "النظام جاهز. يرجى تسجيل الدخول وتهيئة النظام.";
     }
 });
 
@@ -141,25 +145,26 @@ window.saveNewContract = function() {
         document.getElementById('form-hospital').value = '';
         document.getElementById('form-contract-num').value = '';
         document.getElementById('form-value').value = '';
+        // Reset dates
+        document.getElementById('form-start-date').value = '';
+        document.getElementById('form-end-date').value = '';
     });
 };
 
-// --- Table Rendering (تم حذف الأعمدة وإضافة التلميح) ---
+// --- Table Rendering (الحل الجذري هنا) ---
 window.renderTable = function() {
     const { contracts, contractors, monthNames } = window.appData;
     
-    const searchHospEl = document.getElementById('searchHospital');
-    const searchContEl = document.getElementById('searchContractor');
-    if (!searchHospEl || !searchContEl) return;
+    const searchHospEl = document.getElementById('searchBox');
+    if (!searchHospEl) return;
 
-    const searchHosp = searchHospEl.value.toLowerCase();
-    const searchCont = searchContEl.value.toLowerCase();
+    const searchBoxVal = searchHospEl.value.toLowerCase(); // بحث موحد
     const filter = document.getElementById('typeFilter').value;
 
     const hRow = document.getElementById('headerRow');
     if(!hRow) return;
 
-    // تم حذف أعمدة البداية والنهاية والقيمة من هنا
+    // تم حذف أعمدة البداية والنهاية والقيمة من العرض (كما طلبت)
     hRow.innerHTML = `
         <th class="sticky-col-1">الموقع / المستشفى</th>
         <th class="sticky-col-2">نوع العقد</th>
@@ -169,6 +174,8 @@ window.renderTable = function() {
     
     if (Array.isArray(monthNames) && monthNames.length > 0) {
         monthNames.forEach(m => hRow.innerHTML += `<th style="min-width:110px">${m}</th>`);
+    } else {
+        hRow.innerHTML += `<th>لا توجد فترات (حدث النظام)</th>`;
     }
     
     hRow.innerHTML += `<th style="min-width:200px">ملاحظات</th>`;
@@ -179,7 +186,9 @@ window.renderTable = function() {
 
     Object.entries(contracts).map(([id, val])=>({...val, id})).forEach(row => {
         const cName = contractors[row.contractorId]?.name || "غير معروف";
-        const txtMatch = row.hospital.toLowerCase().includes(searchHosp) && cName.toLowerCase().includes(searchCont);
+        
+        // البحث الموحد (مستشفى أو مقاول)
+        const txtMatch = row.hospital.toLowerCase().includes(searchBoxVal) || cName.toLowerCase().includes(searchBoxVal);
         const typeMatch = filter === 'all' || row.type === filter;
 
         if(txtMatch && typeMatch) {
@@ -189,32 +198,43 @@ window.renderTable = function() {
             const lateCount = (row.months||[]).filter(m => m.financeStatus === 'late').length;
             const badge = lateCount > 0 ? 'badge-red' : 'badge-green';
             
-            // تجهيز نص التلميح (Tooltip)
-            const formattedValue = row.value ? Number(row.value).toLocaleString() : '-';
-            const contractDetails = `بداية العقد: ${row.startDate || '-'}\nنهاية العقد: ${row.endDate || '-'}\nالقيمة: ${formattedValue} ريال`;
+            // --- تجهيز بيانات التلميح (Tooltip) ---
+            // نستخدم || '-' لمنع الخطأ في حالة عدم وجود البيانات
+            const sDate = row.startDate || '-';
+            const eDate = row.endDate || '-';
+            // التحقق من القيمة قبل التنسيق
+            let valFormatted = '-';
+            if (row.value) {
+                try { valFormatted = Number(row.value).toLocaleString(); } catch(e) { valFormatted = row.value; }
+            }
+            
+            const contractDetails = `📅 البداية: ${sDate}\n📅 النهاية: ${eDate}\n💰 القيمة: ${valFormatted} ريال`;
 
             tr.innerHTML = `
                 <td class="sticky-col-1">${row.hospital}</td>
                 <td class="sticky-col-2" title="${contractDetails}" style="cursor:help;">
                     <span class="${row.type==='طبي' ? 'type-medical' : 'type-non-medical'}">${row.type}</span>
+                    <div style="font-size:9px; color:#666; margin-top:2px;">(قف للمزيد)</div>
                 </td>
                 <td class="sticky-col-3">${cName}</td>
                 <td><span class="badge ${badge}">${lateCount}</span></td>
             `;
 
             const rowMonths = row.months || [];
-            if (Array.isArray(monthNames)) {
+            if (Array.isArray(monthNames) && monthNames.length > 0) {
                 monthNames.forEach((mName, idx) => {
                     const m = rowMonths[idx];
                     if (m) {
                         let icon='✘', cls='status-late', tit='لم يرفع';
-                        if(m.financeStatus === 'sent') { icon='✅'; cls='status-ok'; tit=`مطالبة: ${m.claimNum}\nخطاب: ${m.letterNum}\nتاريخ: ${m.submissionDate}`; }
-                        else if(m.financeStatus === 'returned') { icon='⚠️'; cls='status-returned'; tit=`إعادة: ${m.returnNotes}`; }
+                        if(m.financeStatus === 'sent') { icon='✅'; cls='status-ok'; tit=`مطالبة: ${m.claimNum||'-'}\nخطاب: ${m.letterNum||'-'}\nتاريخ: ${m.submissionDate||'-'}`; }
+                        else if(m.financeStatus === 'returned') { icon='⚠️'; cls='status-returned'; tit=`إعادة: ${m.returnNotes||'-'}`; }
                         tr.innerHTML += `<td class="${cls}" title="${tit}" onclick="handleCell('${row.id}', ${idx})">${icon}</td>`;
                     } else {
                         tr.innerHTML += `<td>-</td>`;
                     }
                 });
+            } else {
+                tr.innerHTML += `<td>-</td>`;
             }
 
             const editNote = canEdit(row.type) ? `onclick="editNote('${row.id}')"` : '';
@@ -288,11 +308,18 @@ window.systemReset = async function() {
 
 window.updateStats = function() {
     const cs = Object.values(window.appData.contracts);
-    document.getElementById('countHospitals').innerText = new Set(cs.map(c=>c.hospital)).size;
-    document.getElementById('countContractors').innerText = Object.keys(window.appData.contractors).length;
-    document.getElementById('countContracts').innerText = cs.length;
+    const countHospitals = document.getElementById('countHospitals');
+    if(countHospitals) countHospitals.innerText = new Set(cs.map(c=>c.hospital)).size;
+    
+    const countContractors = document.getElementById('countContractors');
+    if(countContractors) countContractors.innerText = Object.keys(window.appData.contractors).length;
+    
+    const countContracts = document.getElementById('countContracts');
+    if(countContracts) countContracts.innerText = cs.length;
+    
     let l = 0; cs.forEach(c => (c.months||[]).forEach(m => {if(m.financeStatus==='late') l++}));
-    document.getElementById('countLate').innerText = l;
+    const countLate = document.getElementById('countLate');
+    if(countLate) countLate.innerText = l;
 };
 
 window.adminLogin = async function() {
