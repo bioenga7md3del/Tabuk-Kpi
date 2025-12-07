@@ -72,7 +72,8 @@
 
         .btn-login { background: #3498db; color: white; }
         .btn-logout { background: #e74c3c; color: white; }
-        .btn-save { background: #27ae60; color: white; }
+        /* زر الحفظ اليدوي (اختياري الآن) */
+        .btn-save { background: #27ae60; color: white; display: none; } 
         .btn-reset { background: #f39c12; color: white; font-size: 12px; }
         .btn-new-month { background: #8e44ad; color: white; border: 1px solid #fff; }
         
@@ -100,6 +101,32 @@
         .filter-select {
             padding: 8px; border-radius: 5px; border: 1px solid #ccc;
             font-family: 'Tajawal', sans-serif; font-size: 14px; min-width: 200px; cursor: pointer;
+        }
+
+        /* إشعار الحفظ التلقائي (Toast) */
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 50px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1000;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            font-size: 17px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            opacity: 0;
+            transition: opacity 0.5s, bottom 0.5s;
+        }
+
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+            bottom: 50px;
         }
 
         table {
@@ -189,7 +216,7 @@
                 print-color-adjust: exact !important; 
             }
             .container { box-shadow: none; margin: 0; padding: 0; width: 100% !important; max-width: none !important; }
-            .admin-panel, .btn-print, #loginSection, .filter-section { display: none !important; }
+            .admin-panel, .btn-print, #loginSection, .filter-section, #toast { display: none !important; }
             th, td { border: 1px solid #000 !important; font-size: 11px; padding: 4px !important; color: black !important; }
             .type-medical { background-color: #e3f2fd !important; }
             .type-non-medical { background-color: #fdebd0 !important; }
@@ -227,11 +254,10 @@
             <button class="btn-new-month super-admin-only" onclick="addNewMonthAutomatic()">📅 إضافة الشهر السابق (إقفال)</button>
             <button class="btn-reset super-admin-only" onclick="uploadInitialData()">⚠ إعادة بناء الجدول (Reset)</button>
             
-            <button class="btn-save" onclick="saveToFirebase()">☁ حفظ التغييرات</button>
             <button class="btn-logout" onclick="location.reload()">خروج</button>
             
             <div style="width: 100%; font-size:12px; color:#bdc3c7; margin-top:5px;">
-                تم التحديث: اضغط مرة واحدة فقط على الخلية لتعديل الحالة أو البيانات.
+                ✅ الحفظ يتم تلقائياً عند إجراء أي تعديل.
             </div>
         </div>
     </div>
@@ -264,6 +290,8 @@
     </div>
 
     <div id="loader">جاري تحميل البيانات من السيرفر...</div>
+    
+    <div id="toast">جاري الحفظ...</div>
 
     <table id="mainTable" style="display:none;">
         <thead>
@@ -323,11 +351,25 @@
         }
     });
 
+    // دالة عرض الإشعار
+    function showToast(message, isSuccess = true) {
+        const x = document.getElementById("toast");
+        x.innerText = message;
+        x.className = "show";
+        if (isSuccess) {
+            setTimeout(function(){ x.className = x.className.replace("show", ""); }, 2500);
+        }
+    }
+
+    // تعديل دالة الحفظ لتكون صامتة مع إشعار
     window.saveToFirebase = function() {
         if (!window.userRole) return;
+        
+        showToast("جاري الحفظ...", false); // إظهار أن الحفظ جاري
+        
         set(ref(db, 'kpi_data_v4'), window.currentData)
-            .then(() => { alert("تم الحفظ بنجاح! ✅"); })
-            .catch((error) => { alert("خطأ: " + error); });
+            .then(() => { showToast("تم الحفظ تلقائياً ✅", true); })
+            .catch((error) => { showToast("خطأ في الحفظ ❌", true); });
     };
 
     window.uploadInitialData = function() {
@@ -342,12 +384,14 @@
                 "مستشفى أبوراكة العام", "مستشفى الملك فهد", "مستشفى الصحة النفسية", 
                 "مستشفى الملك خالد", "مستشفى الولادة والأطفال", "مستشفى الوجه"
             ];
+            
             const initialMonths = Array(12).fill().map(() => ({ status: "✔", letterNum: "", submissionDate: "" }));
             let newRows = [];
             hospitals.forEach(hosp => {
                 newRows.push({ name: hosp, type: "طبي", cont: "اسم المقاول", late: 0, months: JSON.parse(JSON.stringify(initialMonths)), notes: "" });
                 newRows.push({ name: hosp, type: "غير طبي", cont: "اسم المقاول", late: 0, months: JSON.parse(JSON.stringify(initialMonths)), notes: "" });
             });
+
             const initialData = {
                 monthNames: [
                     "أكتوبر 25", "سبتمبر 25", "أغسطس 25", "يوليو 25", 
@@ -356,8 +400,9 @@
                 ],
                 rows: newRows
             };
+            
             window.currentData = initialData;
-            window.saveToFirebase();
+            window.saveToFirebase(); // حفظ تلقائي
         }
     };
 
@@ -390,7 +435,7 @@
         }
 
         renderTable();
-        window.saveToFirebase();
+        window.saveToFirebase(); // حفظ تلقائي
     };
 
 </script>
@@ -544,7 +589,9 @@
             statusObject.status = '✔';
             statusObject.letterNum = num.trim() || '';
             statusObject.submissionDate = date.trim() || '';
+            
             renderTable();
+            window.saveToFirebase(); // حفظ تلقائي
         } 
         // الحالة 2: إذا كان مرفوع (صح) -> نسأل هل يريد التعديل أم الحذف
         else {
@@ -554,6 +601,7 @@
                 statusObject.letterNum = '';
                 statusObject.submissionDate = '';
                 renderTable();
+                window.saveToFirebase(); // حفظ تلقائي
             } else {
                 // المستخدم ضغط إلغاء -> تعديل البيانات
                 let num = prompt("تعديل رقم الخطاب:", statusObject.letterNum);
@@ -565,6 +613,7 @@
                 statusObject.letterNum = num.trim();
                 statusObject.submissionDate = date.trim();
                 renderTable();
+                window.saveToFirebase(); // حفظ تلقائي
             }
         }
     };
@@ -576,6 +625,7 @@
         if (newVal !== null) {
             window.currentData.monthNames[index] = newVal;
             renderTable();
+            window.saveToFirebase(); // حفظ تلقائي
         }
     };
 
@@ -588,6 +638,7 @@
         if (newVal !== null) {
             window.currentData.rows[rowIndex][field] = newVal;
             renderTable();
+            window.saveToFirebase(); // حفظ تلقائي
         }
     };
 
