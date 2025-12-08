@@ -1,8 +1,11 @@
-// --- Tooltip ---
+// js/ui.js
+
+// --- 1. تهيئة وإدارة التلميح العائم (Tooltip) ---
 export function initTooltip() {
     if (!document.getElementById('global-tooltip')) {
         const div = document.createElement('div');
         div.id = 'global-tooltip';
+        div.style.cssText = "position:fixed; background:rgba(44,62,80,0.95); color:#fff; padding:10px 15px; border-radius:8px; font-size:12px; z-index:9999; pointer-events:none; display:none; white-space:pre-line; box-shadow:0 4px 15px rgba(0,0,0,0.3); text-align:right; border:1px solid rgba(255,255,255,0.1);";
         document.body.appendChild(div);
     }
 }
@@ -12,10 +15,16 @@ export function showTooltip(e, text) {
     if (t && text) {
         t.innerText = text;
         t.style.display = 'block';
-        let top = e.clientY + 15, left = e.clientX + 15;
-        if (left + 220 > window.innerWidth) left = e.clientX - 225;
-        if (top + 100 > window.innerHeight) top = e.clientY - 100;
-        t.style.top = top + 'px'; t.style.left = left + 'px';
+        
+        // حساب الموضع لضمان عدم الخروج عن الشاشة
+        let top = e.clientY + 15;
+        let left = e.clientX + 15;
+        
+        if (left + 220 > window.innerWidth) left = e.clientX - 225; // إزاحة لليسار
+        if (top + 100 > window.innerHeight) top = e.clientY - 100;  // إزاحة للأعلى
+        
+        t.style.top = top + 'px';
+        t.style.left = left + 'px';
     }
 }
 
@@ -24,12 +33,12 @@ export function hideTooltip() {
     if (t) t.style.display = 'none';
 }
 
-// --- Status Calculation (Updated) ---
+// --- 2. دالة حساب حالة العقد (المنطق الجديد) ---
 function getContractStatus(start, end) {
     if(!start || !end) return { text: "غير محدد", badge: "badge-grey", is_active: false };
     
     const today = new Date();
-    today.setHours(0,0,0,0); // تصفير الوقت للمقارنة الدقيقة
+    today.setHours(0,0,0,0);
     const sDate = new Date(start);
     const eDate = new Date(end);
     
@@ -40,7 +49,7 @@ function getContractStatus(start, end) {
     if (today < sDate) return { text: "لم يبدأ", badge: "badge-orange", is_active: false };
     if (today > eDate) return { text: "منتهي", badge: "badge-red", is_active: false };
     
-    // الشرط الجديد: إذا تبقى سنة (365 يوم) أو أقل
+    // إذا كان المتبقي 365 يوم أو أقل
     if (diffDays <= 365) {
         return { text: "على وشك الانتهاء", badge: "badge-yellow", is_active: true };
     }
@@ -48,27 +57,35 @@ function getContractStatus(start, end) {
     return { text: "ساري", badge: "badge-green", is_active: true };
 }
 
-// --- Render Table ---
+// --- 3. رسم الجدول الرئيسي (Dashboard Table) ---
 export function renderTable(appData, userRole, canEditFunc) {
     const { contracts, contractors, monthNames } = appData;
+    
+    // عناصر البحث والفلترة
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
     const sCont = document.getElementById('searchContractor')?.value.toLowerCase() || "";
     const filter = document.getElementById('typeFilter')?.value || "all";
+    
     const tbody = document.getElementById('tableBody');
     const hRow = document.getElementById('headerRow');
 
     if (!tbody || !hRow) return;
 
+    // رسم الهيدر
     let hHTML = `<th class="sticky-col-1">اسم العقد</th><th class="sticky-col-2">النوع</th><th class="sticky-col-3">المقاول</th><th style="min-width:40px">تأخير</th>`;
     if (monthNames.length) monthNames.forEach(m => hHTML += `<th style="min-width:100px">${m}</th>`);
     else hHTML += `<th>-</th>`;
     hHTML += `<th style="min-width:150px">ملاحظات</th>`;
     hRow.innerHTML = hHTML;
 
+    // تصفية البيانات
     tbody.innerHTML = '';
     const rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
     
-    if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="15" style="padding:20px;color:#777">لا توجد بيانات</td></tr>`; return; }
+    if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="15" style="padding:20px;color:#777">لا توجد بيانات للعرض</td></tr>`;
+        return;
+    }
 
     const filtered = rows.filter(r => {
         const cName = contractors[r.contractorId]?.name || "";
@@ -78,17 +95,20 @@ export function renderTable(appData, userRole, canEditFunc) {
                (filter === 'all' || r.type === filter);
     });
 
+    // الترتيب: أبجدي (اسم العقد)
     filtered.sort((a, b) => {
         const nA = a.contractName || a.hospital || "";
         const nB = b.contractName || b.hospital || "";
         return nA.localeCompare(nB, 'ar');
     });
 
+    // رسم الصفوف
     filtered.forEach(row => {
         const cName = contractors[row.contractorId]?.name || "غير معروف";
         const cTitle = row.contractName || row.hospital || "بدون اسم";
         const late = (row.months||[]).filter(m => m && m.financeStatus === 'late').length;
         const badge = late > 0 ? 'badge-red' : 'badge-green';
+        
         let valFmt = row.value ? Number(row.value).toLocaleString() : '-';
         const st = getContractStatus(row.startDate, row.endDate);
 
@@ -98,7 +118,10 @@ export function renderTable(appData, userRole, canEditFunc) {
         tr.className = row.type === 'طبي' ? 'row-medical' : 'row-non-medical';
         
         tr.innerHTML = `
-            <td class="sticky-col-1">${cTitle} <span class="badge ${st.badge}" style="font-size:9px; margin-right:5px;">${st.text}</span></td>
+            <td class="sticky-col-1">
+                ${cTitle} 
+                <span class="badge ${st.badge}" style="font-size:9px; margin-right:5px;">${st.text}</span>
+            </td>
             <td class="sticky-col-2" onmousemove="window.showTooltip(event, '${tip.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()" style="cursor:help">
                 <span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span>
             </td>
@@ -106,6 +129,7 @@ export function renderTable(appData, userRole, canEditFunc) {
             <td><span class="badge ${badge}">${late}</span></td>
         `;
 
+        // خلايا الشهور
         if (monthNames.length) {
             monthNames.forEach((m, idx) => {
                 const md = (row.months && row.months[idx]) ? row.months[idx] : {financeStatus:'late'};
@@ -127,30 +151,35 @@ export function renderTable(appData, userRole, canEditFunc) {
         tbody.appendChild(tr);
     });
 
-    return filtered;
+    return filtered; // لإعادة الاستخدام في الإحصائيات
 }
 
-// --- Render Cards ---
+// --- 4. رسم البطاقات والإحصائيات المالية (صفحة سجل العقود) ---
 export function renderCards(appData, type) {
     const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
     if (!grid) return;
     grid.innerHTML = '';
 
     if (type === 'contract') {
+        // قراءة الفلاتر
         const fName = document.getElementById('filterContractName')?.value.toLowerCase() || "";
         const fStatus = document.getElementById('filterContractStatus')?.value || "all";
         const fType = document.getElementById('filterContractType2')?.value || "all";
 
         let activeCount = 0;
+        let soonCount = 0;
         let expiredCount = 0;
         let totalMed = 0;
         let totalNonMed = 0;
 
         const allContracts = Object.entries(appData.contracts);
 
+        // أ. حساب الإحصائيات الشاملة (للكل)
         allContracts.forEach(([, row]) => {
             const st = getContractStatus(row.startDate, row.endDate);
-            if(st.is_active) activeCount++;
+            
+            if(st.text === 'ساري') activeCount++;
+            if(st.text === 'على وشك الانتهاء') soonCount++;
             if(st.text === 'منتهي') expiredCount++;
             
             const val = parseFloat(row.value) || 0;
@@ -158,26 +187,37 @@ export function renderCards(appData, type) {
             if(row.type === 'غير طبي') totalNonMed += val;
         });
 
+        // تحديث أرقام الداش بورد المصغر
         if(document.getElementById('cardActiveContracts')) {
             document.getElementById('cardActiveContracts').innerText = activeCount;
+            document.getElementById('cardSoonContracts').innerText = soonCount;
             document.getElementById('cardExpiredContracts').innerText = expiredCount;
             document.getElementById('cardTotalMedical').innerText = totalMed.toLocaleString() + ' ريال';
             document.getElementById('cardTotalNonMedical').innerText = totalNonMed.toLocaleString() + ' ريال';
         }
 
+        // ب. الفلترة للبطاقات المعروضة
         const filtered = allContracts.filter(([, row]) => {
             const name = row.contractName || row.hospital || "";
             const st = getContractStatus(row.startDate, row.endDate);
             
             const matchName = name.toLowerCase().includes(fName);
-            const matchStatus = fStatus === 'all' || 
-                                (fStatus === 'active' && st.is_active) || 
-                                (fStatus === 'expired' && st.text === 'منتهي');
+            
+            let matchStatus = false;
+            if (fStatus === 'all') matchStatus = true;
+            else if (fStatus === 'active' && st.text === 'ساري') matchStatus = true;
+            else if (fStatus === 'soon' && st.text === 'على وشك الانتهاء') matchStatus = true;
+            else if (fStatus === 'expired' && st.text === 'منتهي') matchStatus = true;
+
             const matchType = fType === 'all' || row.type === fType;
 
             return matchName && matchStatus && matchType;
         });
 
+        // الترتيب
+        filtered.sort(([,a], [,b]) => (a.contractName||a.hospital||"").localeCompare(b.contractName||b.hospital||"", 'ar'));
+
+        // الرسم
         filtered.forEach(([id, row]) => {
             const cName = appData.contractors[row.contractorId]?.name || "-";
             const st = getContractStatus(row.startDate, row.endDate);
@@ -201,6 +241,7 @@ export function renderCards(appData, type) {
         });
 
     } else {
+        // Contractors
         Object.entries(appData.contractors).forEach(([id, row]) => {
             const div = document.createElement('div'); div.className = 'data-card';
             div.innerHTML = `<div class="card-header" style="border:none"><div class="card-title">${row.name}</div></div><div class="card-actions"><button class="btn-primary" onclick="window.prepareEditContractor('${id}','${row.name}')">تعديل</button><button class="btn-danger" onclick="window.deleteContractor('${id}')">حذف</button></div>`;
@@ -209,10 +250,11 @@ export function renderCards(appData, type) {
     }
 }
 
-// --- Update Stats ---
+// --- 5. تحديث إحصائيات الصفحة الرئيسية ---
 export function updateStats(rows, appData) {
     if (!rows || !appData) return;
     
+    // التحقق من العناصر
     const elHosp = document.getElementById('countHospitals');
     if (!elHosp) return; 
 
@@ -222,8 +264,10 @@ export function updateStats(rows, appData) {
 
     rows.forEach(r => {
         const st = getContractStatus(r.startDate, r.endDate);
+        // نعتبر "على وشك الانتهاء" ضمن العقود السارية في الإحصائية العامة
         if(st.text === 'ساري' || st.text === 'على وشك الانتهاء') active++;
         if(st.text === 'منتهي') expired++;
+        
         (r.months||[]).forEach(m => { if(m && m.financeStatus === 'sent') totalSubmitted++; });
     });
     
@@ -243,6 +287,7 @@ export function updateStats(rows, appData) {
     }
 }
 
+// --- دوال مساعدة عامة ---
 export function showToast(msg) {
     const t = document.getElementById("toast"); if(t) { t.innerText = msg; t.className = "show"; setTimeout(() => t.className = "", 2500); }
 }
