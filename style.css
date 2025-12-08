@@ -118,3 +118,22 @@ tr.row-non-medical td.sticky-col-1, tr.row-non-medical td.sticky-col-3 { backgro
     .sticky-col-1, .sticky-col-2, .sticky-col-3 { position: static !important; }
     @page { size: landscape; margin: 5mm; }
 }
+@media print {
+    /* ... (الكود السابق) ... */
+    
+    /* عند طباعة صفحة العقود، نغير التنسيق ليظهر كقائمة */
+    .page-section.active .cards-grid {
+        display: block !important; /* تحويل الشبكة لقائمة */
+    }
+    
+    .page-section.active .data-card {
+        border: 1px solid #000;
+        margin-bottom: 10px;
+        break-inside: avoid; /* منع قص الكرت بين الصفحات */
+        box-shadow: none;
+    }
+    
+    .page-section.active .card-actions {
+        display: none !important; /* إخفاء أزرار التعديل والحذف في الطباعة */
+    }
+}
