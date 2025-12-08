@@ -1,11 +1,8 @@
-// js/ui.js
-
-// --- 1. تهيئة وإدارة التلميح العائم (Tooltip) ---
+// --- Tooltip ---
 export function initTooltip() {
     if (!document.getElementById('global-tooltip')) {
         const div = document.createElement('div');
         div.id = 'global-tooltip';
-        div.style.cssText = "position:fixed; background:rgba(44,62,80,0.95); color:#fff; padding:10px 15px; border-radius:8px; font-size:12px; z-index:9999; pointer-events:none; display:none; white-space:pre-line; box-shadow:0 4px 15px rgba(0,0,0,0.3); text-align:right; border:1px solid rgba(255,255,255,0.1);";
         document.body.appendChild(div);
     }
 }
@@ -15,12 +12,10 @@ export function showTooltip(e, text) {
     if (t && text) {
         t.innerText = text;
         t.style.display = 'block';
-        let top = e.clientY + 15;
-        let left = e.clientX + 15;
+        let top = e.clientY + 15, left = e.clientX + 15;
         if (left + 220 > window.innerWidth) left = e.clientX - 225;
         if (top + 100 > window.innerHeight) top = e.clientY - 100;
-        t.style.top = top + 'px';
-        t.style.left = left + 'px';
+        t.style.top = top + 'px'; t.style.left = left + 'px';
     }
 }
 
@@ -29,10 +24,8 @@ export function hideTooltip() {
     if (t) t.style.display = 'none';
 }
 
-// --- 2. دالة حساب حالة العقد ---
 function getContractStatus(start, end) {
     if(!start || !end) return { text: "غير محدد", badge: "badge-grey", is_active: false };
-    
     const today = new Date();
     today.setHours(0,0,0,0);
     const sDate = new Date(start);
@@ -42,17 +35,16 @@ function getContractStatus(start, end) {
 
     if (today < sDate) return { text: "لم يبدأ", badge: "badge-orange", is_active: false };
     if (today > eDate) return { text: "منتهي", badge: "badge-red", is_active: false };
-    if (diffDays <= 365) {
-        return { text: "على وشك الانتهاء", badge: "badge-yellow", is_active: true };
-    }
+    if (diffDays <= 365) return { text: "على وشك الانتهاء", badge: "badge-yellow", is_active: true };
     return { text: "ساري", badge: "badge-green", is_active: true };
 }
 
-// --- 3. رسم الجدول الرئيسي ---
+// --- Render Table ---
 export function renderTable(appData, userRole, canEditFunc) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
     const sCont = document.getElementById('searchContractor')?.value.toLowerCase() || "";
+    const sClaim = document.getElementById('searchClaim')?.value.toLowerCase() || ""; // بحث برقم المطالبة
     const filter = document.getElementById('typeFilter')?.value || "all";
     const tbody = document.getElementById('tableBody');
     const hRow = document.getElementById('headerRow');
@@ -68,24 +60,22 @@ export function renderTable(appData, userRole, canEditFunc) {
     tbody.innerHTML = '';
     const rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
     
-    if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="15" style="padding:20px;color:#777">لا توجد بيانات للعرض</td></tr>`;
-        return;
-    }
+    if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="15" style="padding:20px;color:#777">لا توجد بيانات</td></tr>`; return; }
 
     const filtered = rows.filter(r => {
         const cName = contractors[r.contractorId]?.name || "";
         const cTitle = r.contractName || r.hospital || "";
+        
+        // البحث برقم المطالبة داخل الشهور
+        const hasClaim = sClaim === "" || (r.months || []).some(m => m.claimNum && m.claimNum.toLowerCase().includes(sClaim));
+
         return (cTitle).toLowerCase().includes(sHosp) && 
                cName.toLowerCase().includes(sCont) && 
-               (filter === 'all' || r.type === filter);
+               (filter === 'all' || r.type === filter) &&
+               hasClaim;
     });
 
-    filtered.sort((a, b) => {
-        const nA = a.contractName || a.hospital || "";
-        const nB = b.contractName || b.hospital || "";
-        return nA.localeCompare(nB, 'ar');
-    });
+    filtered.sort((a, b) => (a.contractName||a.hospital||"").localeCompare(b.contractName||b.hospital||"", 'ar'));
 
     filtered.forEach(row => {
         const cName = contractors[row.contractorId]?.name || "غير معروف";
@@ -115,10 +105,13 @@ export function renderTable(appData, userRole, canEditFunc) {
                 if(md.financeStatus === 'sent') { ic='✅'; cl='status-ok'; ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}\nتاريخ: ${md.submissionDate||'-'}`; }
                 else if(md.financeStatus === 'returned') { ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}`; }
                 
+                // تمييز الخلية إذا كانت تحتوي على رقم المطالبة المبحوث عنه
+                const highlight = (sClaim !== "" && md.claimNum && md.claimNum.toLowerCase().includes(sClaim)) ? "border: 2px solid blue;" : "";
+
                 const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${idx})"` : '';
                 const cursor = canEditFunc(userRole, row.type) ? 'pointer' : 'default';
 
-                tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}">
+                tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}; ${highlight}">
                     <div ${clickAttr} onmousemove="window.showTooltip(event, '${ti.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()">${ic}</div>
                 </td>`;
             });
@@ -132,7 +125,7 @@ export function renderTable(appData, userRole, canEditFunc) {
     return filtered;
 }
 
-// --- 4. رسم البطاقات والإحصائيات المالية ---
+// --- Render Cards ---
 export function renderCards(appData, type) {
     const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
     if (!grid) return;
@@ -143,12 +136,7 @@ export function renderCards(appData, type) {
         const fStatus = document.getElementById('filterContractStatus')?.value || "all";
         const fType = document.getElementById('filterContractType2')?.value || "all";
 
-        let activeCount = 0;
-        let soonCount = 0;
-        let expiredCount = 0;
-        let totalMed = 0;
-        let totalNonMed = 0;
-
+        let activeCount = 0, soonCount = 0, expiredCount = 0, totalMed = 0, totalNonMed = 0;
         const allContracts = Object.entries(appData.contracts);
 
         allContracts.forEach(([, row]) => {
@@ -156,7 +144,6 @@ export function renderCards(appData, type) {
             if(st.text === 'ساري') activeCount++;
             if(st.text === 'على وشك الانتهاء') soonCount++;
             if(st.text === 'منتهي') expiredCount++;
-            
             const val = parseFloat(row.value) || 0;
             if(row.type === 'طبي') totalMed += val;
             if(row.type === 'غير طبي') totalNonMed += val;
@@ -173,15 +160,12 @@ export function renderCards(appData, type) {
         const filtered = allContracts.filter(([, row]) => {
             const name = row.contractName || row.hospital || "";
             const st = getContractStatus(row.startDate, row.endDate);
-            
             const matchName = name.toLowerCase().includes(fName);
-            
             let matchStatus = false;
             if (fStatus === 'all') matchStatus = true;
             else if (fStatus === 'active' && st.text === 'ساري') matchStatus = true;
             else if (fStatus === 'soon' && st.text === 'على وشك الانتهاء') matchStatus = true;
             else if (fStatus === 'expired' && st.text === 'منتهي') matchStatus = true;
-
             const matchType = fType === 'all' || row.type === fType;
             return matchName && matchStatus && matchType;
         });
@@ -219,11 +203,12 @@ export function renderCards(appData, type) {
     }
 }
 
-// --- 5. تحديث إحصائيات الصفحة الرئيسية (تم الإصلاح) ---
+// --- Update Stats ---
 export function updateStats(rows, appData) {
     if (!rows || !appData) return;
-    
-    // حساب الأرقام
+    const elHosp = document.getElementById('countHospitals');
+    if (!elHosp) return; 
+
     const totalLate = rows.reduce((s, r) => s + ((r.months||[]).filter(m => m && m.financeStatus === 'late').length), 0);
     const totalCells = rows.length * (appData.monthNames ? appData.monthNames.length : 1);
     let totalSubmitted = 0, active = 0, expired = 0;
@@ -235,21 +220,11 @@ export function updateStats(rows, appData) {
         (r.months||[]).forEach(m => { if(m && m.financeStatus === 'sent') totalSubmitted++; });
     });
     
-    // تحديث العناصر (مع فحص الوجود لمنع الخطأ)
-    const elHosp = document.getElementById('countHospitals');
-    if (elHosp) elHosp.innerText = new Set(rows.map(r=>r.hospital)).size;
-    
-    const elCont = document.getElementById('countContracts'); 
-    if (elCont) elCont.innerText = rows.length;
-    
-    const elLate = document.getElementById('countLate'); 
-    if (elLate) elLate.innerText = totalLate;
-    
-    const elActive = document.getElementById('countActive'); 
-    if (elActive) elActive.innerText = active;
-    
-    const elExpired = document.getElementById('countExpired'); 
-    if (elExpired) elExpired.innerText = expired;
+    document.getElementById('countHospitals').innerText = new Set(rows.map(r=>r.hospital)).size;
+    document.getElementById('countContracts').innerText = rows.length;
+    document.getElementById('countLate').innerText = totalLate;
+    document.getElementById('countActive').innerText = active;
+    document.getElementById('countExpired').innerText = expired;
     
     const elComp = document.getElementById('complianceRate'); 
     if(elComp) elComp.innerText = totalCells > 0 ? Math.round((totalSubmitted/totalCells)*100)+'%' : '0%';
@@ -261,8 +236,13 @@ export function updateStats(rows, appData) {
     }
 }
 
-// --- Helpers ---
 export function showToast(msg) {
     const t = document.getElementById("toast"); if(t) { t.innerText = msg; t.className = "show"; setTimeout(() => t.className = "", 2500); }
 }
 export function toggleModal(id, show) { const m = document.getElementById(id); if(m) m.style.display = show ? 'flex' : 'none'; }
+export function exportToExcel() {
+    const ws = XLSX.utils.table_to_sheet(document.getElementById('mainTable'));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "KPI");
+    XLSX.writeFile(wb, "KPI_Report.xlsx");
+}
