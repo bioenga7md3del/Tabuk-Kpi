@@ -73,10 +73,49 @@
     </section>
 
     <section id="contracts-view" class="page-section">
-        <div class="admin-panel">
-            <h2 style="margin:0; font-size:18px;">سجل العقود</h2>
-            <button class="btn-success" onclick="openModal('contractModal')">➕ إضافة عقد</button>
+        
+        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
+            <div class="stat-card" style="border-right-color: var(--success);">
+                <span class="stat-number" id="cardActiveContracts">0</span>
+                <span class="stat-label">عقود سارية</span>
+            </div>
+            <div class="stat-card" style="border-right-color: var(--danger);">
+                <span class="stat-number" id="cardExpiredContracts">0</span>
+                <span class="stat-label">عقود منتهية</span>
+            </div>
+            <div class="stat-card" style="border-right-color: var(--primary);">
+                <span class="stat-number" id="cardTotalMedical" style="font-size: 20px;">0</span>
+                <span class="stat-label">إجمالي العقود الطبية</span>
+            </div>
+            <div class="stat-card" style="border-right-color: #d35400;">
+                <span class="stat-number" id="cardTotalNonMedical" style="font-size: 20px;">0</span>
+                <span class="stat-label">إجمالي العقود غير الطبية</span>
+            </div>
         </div>
+
+        <div class="admin-panel">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; flex: 1;">
+                <h2 style="margin:0; font-size:18px; min-width: 100px;">سجل العقود</h2>
+                
+                <input id="filterContractName" class="form-control" style="max-width: 200px;" placeholder="بحث..." onkeyup="renderContractsCards()">
+                <select id="filterContractStatus" class="form-control" style="width: auto;" onchange="renderContractsCards()">
+                    <option value="all">كل الحالات</option>
+                    <option value="active">ساري ✅</option>
+                    <option value="expired">منتهي ❌</option>
+                </select>
+                <select id="filterContractType2" class="form-control" style="width: auto;" onchange="renderContractsCards()">
+                    <option value="all">كل الأنواع</option>
+                    <option value="طبي">طبي</option>
+                    <option value="غير طبي">غير طبي</option>
+                </select>
+            </div>
+            
+            <div style="display: flex; gap: 5px;">
+                <button class="btn-primary" onclick="window.print()">🖨 طباعة القائمة</button>
+                <button class="btn-success" onclick="openModal('contractModal')">➕ إضافة عقد</button>
+            </div>
+        </div>
+
         <div id="contractsGrid" class="cards-grid"></div>
     </section>
 
@@ -98,24 +137,19 @@
         <div class="modal-header"><h3>بيانات العقد</h3><button class="close-btn" onclick="closeModal('contractModal')">&times;</button></div>
         <div class="modal-body">
             <input type="hidden" id="form-contract-id">
-            
             <div class="form-group"><label>اسم العقد / الموقع <span style="color:red">*</span></label><input type="text" id="form-contract-name" class="form-control" placeholder="مثال: عقد صيانة مستشفى..."></div>
-            
             <div style="display:flex; gap:10px;">
                 <div class="form-group" style="flex:1"><label>النوع</label><select id="form-type" class="form-control"><option value="طبي">طبي</option><option value="غير طبي">غير طبي</option></select></div>
                 <div class="form-group" style="flex:1"><label>المقاول</label><select id="form-contractor" class="form-control"></select></div>
             </div>
-            
             <div style="display:flex; gap:10px;">
                 <div class="form-group" style="flex:1"><label>بداية العقد</label><input type="date" id="form-start-date" class="form-control"></div>
                 <div class="form-group" style="flex:1"><label>نهاية العقد</label><input type="date" id="form-end-date" class="form-control"></div>
             </div>
-            
             <div style="display:flex; gap:10px;">
-                <div class="form-group" style="flex:1"><label>المدة (نص)</label><input type="text" id="form-duration" class="form-control" placeholder="مثال: 3 سنوات"></div>
+                <div class="form-group" style="flex:1"><label>المدة</label><input type="text" id="form-duration" class="form-control" placeholder="مثال: 3 سنوات"></div>
                 <div class="form-group" style="flex:1"><label>القيمة</label><input type="number" id="form-value" class="form-control"></div>
             </div>
-            
             <div class="form-group"><label>رقم العقد</label><input type="text" id="form-contract-num" class="form-control"></div>
         </div>
         <div class="modal-footer"><button class="btn-primary" onclick="saveContract()">حفظ</button><button class="btn-danger" onclick="closeModal('contractModal')">إلغاء</button></div>
