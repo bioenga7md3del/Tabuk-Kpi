@@ -51,23 +51,20 @@ function getContractStatus(start, end) {
     return { text: "ساري", badge: "badge-green", is_active: true };
 }
 
-// --- 3. (جديد) رسم تابات السنين ---
+// --- 3. رسم تابات السنين (معدلة: لا تظهر المستقبل) ---
 export function renderYearTabs(contracts, selectedYear) {
     const container = document.getElementById('yearTabs');
     if (!container) return;
 
-    // تجميع كل السنين المتاحة في البيانات
+    const currentYear = new Date().getFullYear(); // السنة الحالية (مثلاً 2026)
+    const startSystemYear = 2024; // سنة بداية النظام
+    
     const years = new Set();
-    const currentYear = new Date().getFullYear();
-    years.add(currentYear); // إضافة السنة الحالية دائماً
-    years.add(2024); // إضافة سنة بداية النظام دائماً
-
-    // البحث في تواريخ العقود لإضافة سنين قديمة أو مستقبلية إن وجدت
-    if (contracts) {
-        Object.values(contracts).forEach(c => {
-            if(c.startDate) years.add(new Date(c.startDate).getFullYear());
-            if(c.endDate) years.add(new Date(c.endDate).getFullYear());
-        });
+    
+    // نضيف السنوات من بداية النظام وحتى السنة الحالية فقط
+    // (نتجاهل أي تواريخ عقود مستقبلية مثل 2027 و 2028 في رسم التابات)
+    for (let y = startSystemYear; y <= currentYear; y++) {
+        years.add(y);
     }
 
     // ترتيب السنين تصاعدياً
@@ -76,9 +73,7 @@ export function renderYearTabs(contracts, selectedYear) {
     // بناء HTML
     let html = `<span class="year-label">السنة المالية:</span>`;
     sortedYears.forEach(y => {
-        // نتحقق هل هذه هي السنة المختارة لإضافه كلاس active
         const activeClass = (y == selectedYear) ? 'active' : '';
-        // عند الضغط نستدعي دالة window.selectYear التي سنضعها في app.js
         html += `<div class="year-tab ${activeClass}" onclick="window.selectYear(${y})">${y}</div>`;
     });
 
@@ -86,7 +81,7 @@ export function renderYearTabs(contracts, selectedYear) {
     container.style.display = 'flex';
 }
 
-// --- 4. رسم الجدول الرئيسي (محدث لدعم الفلترة بالسنة) ---
+// --- 4. رسم الجدول الرئيسي (محدث: يخفي العقود غير النشطة في السنة المختارة) ---
 export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
@@ -98,30 +93,26 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
 
     if (!tbody || !hRow) return;
 
-    // --- منطق فلترة الأعمدة (الجوهر الجديد) ---
-    // نحدد أي الأعمدة سنعرض بناءً على السنة المختارة
+    // --- 1. فلترة الأعمدة (الشهور) ---
     const filteredColumns = []; 
     if (monthNames && monthNames.length) {
         monthNames.forEach((mName, originalIndex) => {
-            // هل اسم الشهر (مثل "يناير 2025") يحتوي على رقم السنة المختارة؟
             if (mName.includes(selectedYear)) {
                 filteredColumns.push({ name: mName, index: originalIndex });
             }
         });
     }
 
-    // رسم الهيدر (فقط للأعمدة المفلترة)
+    // رسم الهيدر
     let hHTML = `<th class="sticky-col-1">اسم العقد</th><th class="sticky-col-2">النوع</th><th class="sticky-col-3">المقاول</th><th style="min-width:40px">تأخير</th>`;
-    
     if (filteredColumns.length > 0) {
         filteredColumns.forEach(col => hHTML += `<th style="min-width:100px">${col.name}</th>`);
     } else {
-        hHTML += `<th>-</th>`; // في حالة عدم وجود شهور لهذه السنة
+        hHTML += `<th>-</th>`;
     }
     hHTML += `<th style="min-width:150px">ملاحظات</th>`;
     hRow.innerHTML = hHTML;
 
-    // تصفية العقود (Rows)
     tbody.innerHTML = '';
     const rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
     
@@ -130,15 +121,28 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         return [];
     }
 
+    // --- 2. فلترة الصفوف (العقود) ---
     const filtered = rows.filter(r => {
         const cName = contractors[r.contractorId]?.name || "";
         const cTitle = r.contractName || r.hospital || "";
         const hasClaim = sClaim === "" || (r.months || []).some(m => m.claimNum && m.claimNum.toLowerCase().includes(sClaim));
+        
+        // التحقق من أن العقد يخص السنة المختارة
+        // الشرط: سنة البداية للعقد <= السنة المختارة
+        // (إذا لم يكن هناك تاريخ بداية، نعرضه في كل السنوات للأمان)
+        let belongsToYear = true;
+        if (r.startDate) {
+            const startYear = new Date(r.startDate).getFullYear();
+            if (startYear > selectedYear) belongsToYear = false; // العقد يبدأ في المستقبل بالنسبة للسنة المختارة
+        }
+        // يمكن إضافة شرط انتهاء العقد أيضاً إذا أردت إخفاء العقود المنتهية قديماً جداً
+        // if (r.endDate) { const endYear = new Date(r.endDate).getFullYear(); if (endYear < selectedYear) belongsToYear = false; }
 
         return (cTitle).toLowerCase().includes(sHosp) && 
                cName.toLowerCase().includes(sCont) && 
                (filter === 'all' || r.type === filter) &&
-               hasClaim;
+               hasClaim &&
+               belongsToYear; // ✅ تم إضافة الشرط الجديد
     });
 
     filtered.sort((a, b) => {
@@ -150,11 +154,8 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     filtered.forEach(row => {
         const cName = contractors[row.contractorId]?.name || "غير معروف";
         const cTitle = row.contractName || row.hospital || "بدون اسم";
-        
-        // حساب المتأخرات الكلية (طوال فترة العقد) وليس فقط للسنة المعروضة، ليكون التنبيه حقيقياً
         const late = (row.months||[]).filter(m => m && m.financeStatus === 'late').length;
         const badge = late > 0 ? 'badge-red' : 'badge-green';
-        
         let valFmt = row.value ? Number(row.value).toLocaleString() : '-';
         const st = getContractStatus(row.startDate, row.endDate);
         const tip = `📄 رقم العقد: ${row.contractNumber||'-'}\n💰 القيمة: ${valFmt} ريال\n⏳ المدة: ${row.duration||'-'}\n📅 البداية: ${row.startDate||'-'}\n📅 النهاية: ${row.endDate||'-'}\n📊 الحالة: ${st.text}`;
@@ -171,11 +172,8 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
             <td><span class="badge ${badge}">${late}</span></td>
         `;
 
-        // رسم خلايا الشهور (فقط المفلترة)
         if (filteredColumns.length > 0) {
             filteredColumns.forEach(col => {
-                // نستخدم col.index للوصول للبيانات الصحيحة في المصفوفة الأصلية
-                // حتى لو كان ترتيب العرض مختلفاً
                 const originalIndex = col.index;
                 const md = (row.months && row.months[originalIndex]) ? row.months[originalIndex] : {financeStatus:'late'};
                 
@@ -297,7 +295,6 @@ export function updateStats(rows, appData) {
         (r.months||[]).forEach(m => { if(m && m.financeStatus === 'sent') totalSubmitted++; });
     });
     
-    // التحديث المشروط
     const elHosp = document.getElementById('countHospitals');
     if (elHosp) elHosp.innerText = new Set(rows.map(r=>r.hospital)).size;
     
