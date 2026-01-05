@@ -34,31 +34,31 @@ function getContractStatus(start, end) {
     return { text: "ساري", badge: "badge-green", is_active: true };
 }
 
-// --- 3. رسم تابات السنين (معدلة: تكتشف أقدم سنة تلقائياً) ---
+// --- 3. Render Year Tabs (Auto-detect start year) ---
 export function renderYearTabs(contracts, selectedYear) {
     const container = document.getElementById('yearTabs');
     if (!container) return;
 
     const currentYear = new Date().getFullYear();
-    let minYear = 2024; // قيمة افتراضية
+    let minYear = 2024; // Default
 
-    // البحث في العقود عن أقدم سنة بداية
+    // Find oldest contract start date
     if (contracts) {
         Object.values(contracts).forEach(c => {
             if (c.startDate) {
                 const y = new Date(c.startDate).getFullYear();
-                if (y < minYear) minYear = y; // إذا وجدنا سنة أقدم (مثلاً 2020) نعتمدها
+                if (y < minYear) minYear = y;
             }
         });
     }
 
-    // توليد السنوات من "أقدم سنة" وحتى "السنة الحالية"
+    // Generate years range
     const sortedYears = [];
     for (let y = minYear; y <= currentYear; y++) {
         sortedYears.push(y);
     }
 
-    // بناء HTML
+    // Render Tabs
     let html = `<span class="year-label">السنة المالية:</span>`;
     sortedYears.forEach(y => {
         const activeClass = (y == selectedYear) ? 'active' : '';
@@ -69,7 +69,7 @@ export function renderYearTabs(contracts, selectedYear) {
     container.style.display = 'flex';
 }
 
-// --- 4. رسم الجدول (معدلة: فلترة العقود حسب السنة) ---
+// --- 4. Render Table (Filtered by Year) ---
 export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
@@ -81,7 +81,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
 
     if (!tbody || !hRow) return;
 
-    // 1. فلترة الأعمدة (الشهور)
+    // Filter Columns based on Selected Year
     const filteredColumns = []; 
     if (monthNames && monthNames.length) {
         monthNames.forEach((mName, originalIndex) => {
@@ -89,7 +89,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         });
     }
 
-    // رسم الهيدر
+    // Render Header
     let hHTML = `<th class="sticky-col-1">اسم العقد</th><th class="sticky-col-2">النوع</th><th class="sticky-col-3">المقاول</th><th style="min-width:40px">تأخير</th>`;
     if (filteredColumns.length > 0) filteredColumns.forEach(col => hHTML += `<th style="min-width:100px">${col.name}</th>`);
     else hHTML += `<th>-</th>`;
@@ -100,18 +100,17 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
     if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="15" style="padding:20px;color:#777">لا توجد بيانات</td></tr>`; return []; }
 
-    // 2. فلترة الصفوف (العقود)
+    // Filter Rows
     const filtered = rows.filter(r => {
         const cName = contractors[r.contractorId]?.name || "";
         const cTitle = r.contractName || r.hospital || "";
         const hasClaim = sClaim === "" || (r.months || []).some(m => m.claimNum && m.claimNum.toLowerCase().includes(sClaim));
         
-        // التحقق من السنة: هل العقد كان موجوداً في هذه السنة؟
-        // الشرط: سنة البداية <= السنة المختارة
+        // Only show contracts that started on or before the selected year
         let showContract = true;
         if (r.startDate) {
             const startYear = new Date(r.startDate).getFullYear();
-            if (startYear > selectedYear) showContract = false; // العقد يبدأ في المستقبل
+            if (startYear > selectedYear) showContract = false;
         }
 
         return (cTitle).toLowerCase().includes(sHosp) && 
@@ -126,6 +125,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     filtered.forEach(row => {
         const cName = contractors[row.contractorId]?.name || "غير معروف";
         const cTitle = row.contractName || row.hospital || "بدون اسم";
+        // Calculate total late (lifetime) for accuracy
         const late = (row.months||[]).filter(m => m && m.financeStatus === 'late').length;
         const badge = late > 0 ? 'badge-red' : 'badge-green';
         let valFmt = row.value ? Number(row.value).toLocaleString() : '-';
@@ -142,18 +142,34 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
             <td><span class="badge ${badge}">${late}</span></td>
         `;
 
+        // Render Month Cells (Only filtered ones)
         if (filteredColumns.length > 0) {
             filteredColumns.forEach(col => {
-                const md = (row.months && row.months[col.index]) ? row.months[col.index] : {financeStatus:'late'};
+                const originalIndex = col.index; // Crucial: Use original index
+                const md = (row.months && row.months[originalIndex]) ? row.months[originalIndex] : {financeStatus:'late'};
+                
                 let ic='✘', cl='status-late', ti='لم يرفع';
-                if(md.financeStatus === 'sent') { ic='✅'; cl='status-ok'; ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}`; }
-                else if(md.financeStatus === 'returned') { ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}`; }
+                
+                // --- هنا منطق الأيقونات ---
+                if(md.financeStatus === 'sent') { 
+                    ic='✅'; cl='status-ok'; // تم رفعه للمالية
+                    ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}`; 
+                }
+                else if(md.financeStatus === 'returned') { 
+                    ic='⚠️'; cl='status-returned'; // تم إرجاعه
+                    ti=`إعادة: ${md.returnNotes||'-'}`; 
+                }
+                
                 const highlight = (sClaim !== "" && md.claimNum && md.claimNum.toLowerCase().includes(sClaim)) ? "border: 2px solid blue;" : "";
-                const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${col.index})"` : '';
+                
+                // التأكد من تفعيل الضغط (Click)
+                const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
                 const cursor = canEditFunc(userRole, row.type) ? 'pointer' : 'default';
+
                 tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}; ${highlight}"><div ${clickAttr} onmousemove="window.showTooltip(event, '${ti.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()">${ic}</div></td>`;
             });
         } else { tr.innerHTML += `<td>-</td>`; }
+        
         const en = canEditFunc(userRole, row.type) ? `onclick="window.editNote('${row.id}')"` : '';
         tr.innerHTML += `<td ${en} style="cursor:${canEditFunc(userRole, row.type)?'pointer':'default'}; font-size:11px;">${row.notes||''}</td>`;
         tbody.appendChild(tr);
@@ -167,11 +183,7 @@ export function renderCards(appData, type) {
     const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
     if (!grid) return;
     grid.innerHTML = '';
-    // (نفس كود الكروت الذي لديك - لم يتغير)
-    // للتأكد انسخ دالة renderCards من ردودي السابقة إذا كنت تحتاجها كاملة، 
-    // ولكن التعديل المهم كان فقط في renderYearTabs و renderTable أعلاه.
-    
-    // سأضع الكود المختصر هنا لضمان عمل الملف، يرجى استخدام الكود الكامل إذا كان لديك
+    // (Same card rendering logic - preserved)
     if (type === 'contract') {
         const fName = document.getElementById('filterContractName')?.value.toLowerCase() || "";
         const fStatus = document.getElementById('filterContractStatus')?.value || "all";
@@ -225,18 +237,37 @@ export function renderCards(appData, type) {
     }
 }
 
-// --- 6. Update Stats ---
-export function updateStats(rows, appData) {
+// --- 6. Update Stats (Smart Version) ---
+export function updateStats(rows, appData, selectedYear) {
     if (!rows || !appData) return;
-    const totalLate = rows.reduce((s, r) => s + ((r.months||[]).filter(m => m && m.financeStatus === 'late').length), 0);
-    const totalCells = rows.length * (appData.monthNames ? appData.monthNames.length : 1);
-    let totalSubmitted = 0, active = 0, expired = 0;
+    
+    // Filter columns for stats
+    const validIndices = [];
+    if (appData.monthNames) {
+        appData.monthNames.forEach((m, i) => {
+            if (m.includes(selectedYear)) validIndices.push(i);
+        });
+    }
+
+    let totalLate = 0, totalSubmitted = 0;
+    const totalCells = rows.length * validIndices.length;
+    let active = 0, expired = 0;
+
     rows.forEach(r => {
         const st = getContractStatus(r.startDate, r.endDate);
         if(st.text === 'ساري' || st.text === 'على وشك الانتهاء') active++;
         if(st.text === 'منتهي') expired++;
-        (r.months||[]).forEach(m => { if(m && m.financeStatus === 'sent') totalSubmitted++; });
+        if (r.months) {
+            validIndices.forEach(idx => {
+                const m = r.months[idx];
+                if (m) {
+                    if (m.financeStatus === 'late') totalLate++;
+                    if (m.financeStatus === 'sent') totalSubmitted++;
+                }
+            });
+        }
     });
+    
     const elHosp = document.getElementById('countHospitals'); if (elHosp) elHosp.innerText = new Set(rows.map(r=>r.hospital)).size;
     const elCont = document.getElementById('countContracts'); if (elCont) elCont.innerText = rows.length;
     const elLate = document.getElementById('countLate'); if (elLate) elLate.innerText = totalLate;
