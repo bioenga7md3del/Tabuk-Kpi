@@ -51,8 +51,43 @@ function getContractStatus(start, end) {
     return { text: "ساري", badge: "badge-green", is_active: true };
 }
 
-// --- 3. رسم الجدول الرئيسي ---
-export function renderTable(appData, userRole, canEditFunc) {
+// --- 3. (جديد) رسم تابات السنين ---
+export function renderYearTabs(contracts, selectedYear) {
+    const container = document.getElementById('yearTabs');
+    if (!container) return;
+
+    // تجميع كل السنين المتاحة في البيانات
+    const years = new Set();
+    const currentYear = new Date().getFullYear();
+    years.add(currentYear); // إضافة السنة الحالية دائماً
+    years.add(2024); // إضافة سنة بداية النظام دائماً
+
+    // البحث في تواريخ العقود لإضافة سنين قديمة أو مستقبلية إن وجدت
+    if (contracts) {
+        Object.values(contracts).forEach(c => {
+            if(c.startDate) years.add(new Date(c.startDate).getFullYear());
+            if(c.endDate) years.add(new Date(c.endDate).getFullYear());
+        });
+    }
+
+    // ترتيب السنين تصاعدياً
+    const sortedYears = Array.from(years).sort((a, b) => a - b);
+
+    // بناء HTML
+    let html = `<span class="year-label">السنة المالية:</span>`;
+    sortedYears.forEach(y => {
+        // نتحقق هل هذه هي السنة المختارة لإضافه كلاس active
+        const activeClass = (y == selectedYear) ? 'active' : '';
+        // عند الضغط نستدعي دالة window.selectYear التي سنضعها في app.js
+        html += `<div class="year-tab ${activeClass}" onclick="window.selectYear(${y})">${y}</div>`;
+    });
+
+    container.innerHTML = html;
+    container.style.display = 'flex';
+}
+
+// --- 4. رسم الجدول الرئيسي (محدث لدعم الفلترة بالسنة) ---
+export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
     const sCont = document.getElementById('searchContractor')?.value.toLowerCase() || "";
@@ -63,18 +98,36 @@ export function renderTable(appData, userRole, canEditFunc) {
 
     if (!tbody || !hRow) return;
 
+    // --- منطق فلترة الأعمدة (الجوهر الجديد) ---
+    // نحدد أي الأعمدة سنعرض بناءً على السنة المختارة
+    const filteredColumns = []; 
+    if (monthNames && monthNames.length) {
+        monthNames.forEach((mName, originalIndex) => {
+            // هل اسم الشهر (مثل "يناير 2025") يحتوي على رقم السنة المختارة؟
+            if (mName.includes(selectedYear)) {
+                filteredColumns.push({ name: mName, index: originalIndex });
+            }
+        });
+    }
+
+    // رسم الهيدر (فقط للأعمدة المفلترة)
     let hHTML = `<th class="sticky-col-1">اسم العقد</th><th class="sticky-col-2">النوع</th><th class="sticky-col-3">المقاول</th><th style="min-width:40px">تأخير</th>`;
-    if (monthNames.length) monthNames.forEach(m => hHTML += `<th style="min-width:100px">${m}</th>`);
-    else hHTML += `<th>-</th>`;
+    
+    if (filteredColumns.length > 0) {
+        filteredColumns.forEach(col => hHTML += `<th style="min-width:100px">${col.name}</th>`);
+    } else {
+        hHTML += `<th>-</th>`; // في حالة عدم وجود شهور لهذه السنة
+    }
     hHTML += `<th style="min-width:150px">ملاحظات</th>`;
     hRow.innerHTML = hHTML;
 
+    // تصفية العقود (Rows)
     tbody.innerHTML = '';
     const rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
     
     if (rows.length === 0) {
         tbody.innerHTML = `<tr><td colspan="15" style="padding:20px;color:#777">لا توجد بيانات للعرض</td></tr>`;
-        return;
+        return [];
     }
 
     const filtered = rows.filter(r => {
@@ -97,8 +150,11 @@ export function renderTable(appData, userRole, canEditFunc) {
     filtered.forEach(row => {
         const cName = contractors[row.contractorId]?.name || "غير معروف";
         const cTitle = row.contractName || row.hospital || "بدون اسم";
+        
+        // حساب المتأخرات الكلية (طوال فترة العقد) وليس فقط للسنة المعروضة، ليكون التنبيه حقيقياً
         const late = (row.months||[]).filter(m => m && m.financeStatus === 'late').length;
         const badge = late > 0 ? 'badge-red' : 'badge-green';
+        
         let valFmt = row.value ? Number(row.value).toLocaleString() : '-';
         const st = getContractStatus(row.startDate, row.endDate);
         const tip = `📄 رقم العقد: ${row.contractNumber||'-'}\n💰 القيمة: ${valFmt} ريال\n⏳ المدة: ${row.duration||'-'}\n📅 البداية: ${row.startDate||'-'}\n📅 النهاية: ${row.endDate||'-'}\n📊 الحالة: ${st.text}`;
@@ -115,22 +171,29 @@ export function renderTable(appData, userRole, canEditFunc) {
             <td><span class="badge ${badge}">${late}</span></td>
         `;
 
-        if (monthNames.length) {
-            monthNames.forEach((m, idx) => {
-                const md = (row.months && row.months[idx]) ? row.months[idx] : {financeStatus:'late'};
+        // رسم خلايا الشهور (فقط المفلترة)
+        if (filteredColumns.length > 0) {
+            filteredColumns.forEach(col => {
+                // نستخدم col.index للوصول للبيانات الصحيحة في المصفوفة الأصلية
+                // حتى لو كان ترتيب العرض مختلفاً
+                const originalIndex = col.index;
+                const md = (row.months && row.months[originalIndex]) ? row.months[originalIndex] : {financeStatus:'late'};
+                
                 let ic='✘', cl='status-late', ti='لم يرفع';
                 if(md.financeStatus === 'sent') { ic='✅'; cl='status-ok'; ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}\nتاريخ: ${md.submissionDate||'-'}`; }
                 else if(md.financeStatus === 'returned') { ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}`; }
                 
                 const highlight = (sClaim !== "" && md.claimNum && md.claimNum.toLowerCase().includes(sClaim)) ? "border: 2px solid blue;" : "";
-                const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${idx})"` : '';
+                const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
                 const cursor = canEditFunc(userRole, row.type) ? 'pointer' : 'default';
 
                 tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}; ${highlight}">
                     <div ${clickAttr} onmousemove="window.showTooltip(event, '${ti.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()">${ic}</div>
                 </td>`;
             });
-        } else { tr.innerHTML += `<td>-</td>`; }
+        } else { 
+            tr.innerHTML += `<td>-</td>`; 
+        }
 
         const en = canEditFunc(userRole, row.type) ? `onclick="window.editNote('${row.id}')"` : '';
         tr.innerHTML += `<td ${en} style="cursor:${canEditFunc(userRole, row.type)?'pointer':'default'}; font-size:11px;">${row.notes||''}</td>`;
@@ -140,7 +203,7 @@ export function renderTable(appData, userRole, canEditFunc) {
     return filtered;
 }
 
-// --- 4. رسم البطاقات ---
+// --- 5. رسم البطاقات ---
 export function renderCards(appData, type) {
     const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
     if (!grid) return;
@@ -218,7 +281,7 @@ export function renderCards(appData, type) {
     }
 }
 
-// --- 5. تحديث الإحصائيات (الرئيسية) - النسخة المصححة ---
+// --- 6. تحديث الإحصائيات (النسخة الآمنة) ---
 export function updateStats(rows, appData) {
     if (!rows || !appData) return;
     
@@ -234,7 +297,7 @@ export function updateStats(rows, appData) {
         (r.months||[]).forEach(m => { if(m && m.financeStatus === 'sent') totalSubmitted++; });
     });
     
-    // التحديث المشروط (يمنع الخطأ إذا اختفى عنصر من الـ HTML)
+    // التحديث المشروط
     const elHosp = document.getElementById('countHospitals');
     if (elHosp) elHosp.innerText = new Set(rows.map(r=>r.hospital)).size;
     
