@@ -2,8 +2,10 @@ import * as DB from "./db.js";
 import * as Auth from "./auth.js";
 import * as UI from "./ui.js";
 
+// Global State
 window.appData = { contractors: {}, contracts: {}, monthNames: [] };
 window.userRole = null;
+window.selectedYear = new Date().getFullYear(); // الافتراضي: السنة الحالية
 window.appPasswords = { super: '1234', medical: '1111', non_medical: '2222' };
 
 UI.initTooltip();
@@ -24,8 +26,16 @@ DB.listenToData((data) => {
 DB.listenToPasswords((pass) => window.appPasswords = pass);
 
 function refreshView() {
-    const rows = UI.renderTable(window.appData, window.userRole, Auth.canEdit);
+    // 1. رسم تابات السنين أولاً
+    UI.renderYearTabs(window.appData.contracts, window.selectedYear);
+
+    // 2. رسم الجدول بناءً على السنة المختارة
+    // (نمرر window.selectedYear للدالة)
+    const rows = UI.renderTable(window.appData, window.userRole, Auth.canEdit, window.selectedYear);
+    
+    // 3. تحديث الإحصائيات
     UI.updateStats(rows, window.appData);
+    
     if (window.userRole && window.userRole !== 'viewer') {
         UI.renderCards(window.appData, 'contract');
         UI.renderCards(window.appData, 'contractor');
@@ -34,10 +44,17 @@ function refreshView() {
 
 // --- Global Binding ---
 window.renderTable = refreshView;
+
+// دالة جديدة لتغيير السنة عند الضغط على التاب
+window.selectYear = function(year) {
+    window.selectedYear = year;
+    refreshView();
+};
+
 window.renderContractsCards = function() { UI.renderCards(window.appData, 'contract'); };
 window.showTooltip = UI.showTooltip;
 window.hideTooltip = UI.hideTooltip;
-window.exportToExcel = UI.exportToExcel; // Fix for Excel button
+window.exportToExcel = UI.exportToExcel;
 
 window.switchView = function(viewId) {
     document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
@@ -143,20 +160,67 @@ window.editNote = async function(cid) {
     if(t!==undefined) DB.updateContract(cid, {notes:t});
 };
 
+// --- الدالة المحدثة والآمنة لتحديث الشهور ---
 window.refreshMonthsSystem = async function() {
     if(!window.userRole) return;
-    if(!(await Swal.fire({title:'تحديث؟',icon:'warning',showCancelButton:true})).isConfirmed) return;
-    const now = new Date();
-    const arM = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-    let mNames = [];
-    for(let i=0; i<now.getMonth(); i++) mNames.push(`${arM[i]} ${now.getFullYear()}`);
-    mNames.reverse();
-    DB.updateMonthsList(mNames);
-    Object.entries(window.appData.contracts).forEach(([id, c]) => {
-        const adj = new Array(mNames.length).fill(null).map((_,i) => (c.months||[])[i] || {status:"late", financeStatus:"late"});
-        DB.updateContractMonths(id, adj);
+    
+    // تأكيد من المستخدم
+    const result = await Swal.fire({
+        title: 'تحديث هيكل الشهور؟',
+        text: "سيتم إنشاء وتحديث الشهور من 2024 وحتى اليوم.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'نعم، تحديث',
+        cancelButtonText: 'إلغاء'
     });
-    UI.showToast("تم التحديث");
+
+    if(!result.isConfirmed) return;
+
+    // 1. تحديد البداية والنهاية
+    const startDate = new Date(2024, 0, 1); // 1 يناير 2024
+    const now = new Date(); // اليوم
+    
+    const arM = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    let mNames = [];
+
+    // 2. توليد قائمة الشهور التراكمية
+    let current = new Date(startDate);
+    while (current <= now) {
+        let mIndex = current.getMonth();
+        let y = current.getFullYear();
+        mNames.push(`${arM[mIndex]} ${y}`);
+        current.setMonth(current.getMonth() + 1);
+    }
+    mNames.reverse(); // الأحدث أولاً
+    
+    // 3. تحديث القائمة في قاعدة البيانات
+    await DB.updateMonthsList(mNames);
+
+    // 4. تحديث مصفوفات الشهور داخل كل عقد (دون مسح القديم)
+    const updates = {};
+    Object.entries(window.appData.contracts).forEach(([id, c]) => {
+        const oldMonths = c.months || [];
+        
+        // إذا كان عدد الشهور في النظام أكبر من عدد الشهور في العقد
+        // نضيف خانات "late" جديدة للفرق، ونحتفظ بالقديم
+        if (oldMonths.length < mNames.length) {
+            const diff = mNames.length - oldMonths.length;
+            
+            // لأن المصفوفة معكوسة (الأحدث index 0)، العناصر الجديدة تضاف في البداية
+            const extension = new Array(diff).fill({status: "late", financeStatus: "late"});
+            
+            // دمج الجديد مع القديم
+            updates[`app_db_v2/contracts/${id}/months`] = [...extension, ...oldMonths];
+        }
+    });
+    
+    // تنفيذ التحديثات إن وجدت
+    if(Object.keys(updates).length > 0) {
+        await DB.update(DB.ref(DB.db), updates);
+    }
+    
+    UI.showToast("تم التحديث (2024 - الآن)");
+    setTimeout(() => location.reload(), 1500);
 };
 
 window.systemReset = async function() {
