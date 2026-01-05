@@ -34,15 +34,14 @@ function getContractStatus(start, end) {
     return { text: "ساري", badge: "badge-green", is_active: true };
 }
 
-// --- 3. Render Year Tabs (Auto-detect start year) ---
+// --- 3. Render Year Tabs ---
 export function renderYearTabs(contracts, selectedYear) {
     const container = document.getElementById('yearTabs');
     if (!container) return;
 
     const currentYear = new Date().getFullYear();
-    let minYear = 2024; // Default
+    let minYear = 2024; 
 
-    // Find oldest contract start date
     if (contracts) {
         Object.values(contracts).forEach(c => {
             if (c.startDate) {
@@ -52,13 +51,11 @@ export function renderYearTabs(contracts, selectedYear) {
         });
     }
 
-    // Generate years range
     const sortedYears = [];
     for (let y = minYear; y <= currentYear; y++) {
         sortedYears.push(y);
     }
 
-    // Render Tabs
     let html = `<span class="year-label">السنة المالية:</span>`;
     sortedYears.forEach(y => {
         const activeClass = (y == selectedYear) ? 'active' : '';
@@ -69,7 +66,7 @@ export function renderYearTabs(contracts, selectedYear) {
     container.style.display = 'flex';
 }
 
-// --- 4. Render Table (Filtered by Year) ---
+// --- 4. Render Table (FIXED CLICK AREA) ---
 export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
@@ -81,7 +78,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
 
     if (!tbody || !hRow) return;
 
-    // Filter Columns based on Selected Year
+    // Filter Columns
     const filteredColumns = []; 
     if (monthNames && monthNames.length) {
         monthNames.forEach((mName, originalIndex) => {
@@ -89,7 +86,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         });
     }
 
-    // Render Header
+    // Header
     let hHTML = `<th class="sticky-col-1">اسم العقد</th><th class="sticky-col-2">النوع</th><th class="sticky-col-3">المقاول</th><th style="min-width:40px">تأخير</th>`;
     if (filteredColumns.length > 0) filteredColumns.forEach(col => hHTML += `<th style="min-width:100px">${col.name}</th>`);
     else hHTML += `<th>-</th>`;
@@ -105,19 +102,12 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         const cName = contractors[r.contractorId]?.name || "";
         const cTitle = r.contractName || r.hospital || "";
         const hasClaim = sClaim === "" || (r.months || []).some(m => m.claimNum && m.claimNum.toLowerCase().includes(sClaim));
-        
-        // Only show contracts that started on or before the selected year
         let showContract = true;
         if (r.startDate) {
             const startYear = new Date(r.startDate).getFullYear();
             if (startYear > selectedYear) showContract = false;
         }
-
-        return (cTitle).toLowerCase().includes(sHosp) && 
-               cName.toLowerCase().includes(sCont) && 
-               (filter === 'all' || r.type === filter) &&
-               hasClaim &&
-               showContract;
+        return (cTitle).toLowerCase().includes(sHosp) && cName.toLowerCase().includes(sCont) && (filter === 'all' || r.type === filter) && hasClaim && showContract;
     });
 
     filtered.sort((a, b) => (a.contractName||a.hospital||"").localeCompare(b.contractName||b.hospital||"", 'ar'));
@@ -125,7 +115,6 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     filtered.forEach(row => {
         const cName = contractors[row.contractorId]?.name || "غير معروف";
         const cTitle = row.contractName || row.hospital || "بدون اسم";
-        // Calculate total late (lifetime) for accuracy
         const late = (row.months||[]).filter(m => m && m.financeStatus === 'late').length;
         const badge = late > 0 ? 'badge-red' : 'badge-green';
         let valFmt = row.value ? Number(row.value).toLocaleString() : '-';
@@ -142,31 +131,24 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
             <td><span class="badge ${badge}">${late}</span></td>
         `;
 
-        // Render Month Cells (Only filtered ones)
         if (filteredColumns.length > 0) {
             filteredColumns.forEach(col => {
-                const originalIndex = col.index; // Crucial: Use original index
+                const originalIndex = col.index;
                 const md = (row.months && row.months[originalIndex]) ? row.months[originalIndex] : {financeStatus:'late'};
                 
                 let ic='✘', cl='status-late', ti='لم يرفع';
-                
-                // --- هنا منطق الأيقونات ---
-                if(md.financeStatus === 'sent') { 
-                    ic='✅'; cl='status-ok'; // تم رفعه للمالية
-                    ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}`; 
-                }
-                else if(md.financeStatus === 'returned') { 
-                    ic='⚠️'; cl='status-returned'; // تم إرجاعه
-                    ti=`إعادة: ${md.returnNotes||'-'}`; 
-                }
+                if(md.financeStatus === 'sent') { ic='✅'; cl='status-ok'; ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}`; }
+                else if(md.financeStatus === 'returned') { ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}`; }
                 
                 const highlight = (sClaim !== "" && md.claimNum && md.claimNum.toLowerCase().includes(sClaim)) ? "border: 2px solid blue;" : "";
                 
-                // التأكد من تفعيل الضغط (Click)
+                // --- التعديل هنا: وضع الـ onclick على الـ td مباشرة ---
                 const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
                 const cursor = canEditFunc(userRole, row.type) ? 'pointer' : 'default';
 
-                tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}; ${highlight}"><div ${clickAttr} onmousemove="window.showTooltip(event, '${ti.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()">${ic}</div></td>`;
+                tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}; ${highlight}" ${clickAttr}>
+                    <div onmousemove="window.showTooltip(event, '${ti.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()">${ic}</div>
+                </td>`;
             });
         } else { tr.innerHTML += `<td>-</td>`; }
         
@@ -183,7 +165,9 @@ export function renderCards(appData, type) {
     const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
     if (!grid) return;
     grid.innerHTML = '';
-    // (Same card rendering logic - preserved)
+    
+    // ... (نفس كود الكروت الذي لديك - لم يتغير) ...
+    // اختصاراً، احتفظ بالكود القديم هنا لـ renderCards لأنه سليم
     if (type === 'contract') {
         const fName = document.getElementById('filterContractName')?.value.toLowerCase() || "";
         const fStatus = document.getElementById('filterContractStatus')?.value || "all";
@@ -241,7 +225,6 @@ export function renderCards(appData, type) {
 export function updateStats(rows, appData, selectedYear) {
     if (!rows || !appData) return;
     
-    // Filter columns for stats
     const validIndices = [];
     if (appData.monthNames) {
         appData.monthNames.forEach((m, i) => {
