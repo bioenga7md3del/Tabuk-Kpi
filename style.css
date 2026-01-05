@@ -97,26 +97,55 @@ tr.row-non-medical td.sticky-col-1, tr.row-non-medical td.sticky-col-3 { backgro
 #toast { visibility: hidden; background: #333; color: white; padding: 10px 25px; border-radius: 50px; position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 3000; }
 #toast.show { visibility: visible; bottom: 50px; opacity: 1; }
 
-/* Print Settings (إصلاح الطباعة) */
+/* --- Year Tabs Styling (New) --- */
+.year-tabs-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    align-items: center;
+    overflow-x: auto;
+}
+.year-label { font-weight: bold; color: var(--secondary); margin-left: 10px; }
+.year-tab {
+    padding: 8px 20px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    color: #777;
+    background: #f9f9f9;
+    transition: 0.3s;
+    user-select: none;
+    white-space: nowrap;
+}
+.year-tab:hover { background: #eee; color: var(--primary); }
+.year-tab.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 4px 10px rgba(0,86,179,0.2);
+}
+
+/* Print Settings */
 @media print {
-    @page { size: landscape; margin: 5mm; } /* فرض الوضع الأفقي */
+    @page { size: landscape; margin: 5mm; }
     .navbar, .admin-panel, .btn-print, #loginSection, .modal-overlay, .toolbar-section, .card-actions { display: none !important; }
     .container { box-shadow: none; padding: 0; width: 100%; max-width: 100%; }
     .page-section { display: none; }
     #dashboard-view { display: block; }
-    .dashboard-container { display: none; } /* إخفاء الإحصائيات العلوية */
-    
+    .dashboard-container { display: none; }
     .table-wrapper { overflow: visible !important; border: none; }
     table { width: 100%; min-width: 100%; }
     th, td { border: 1px solid #000 !important; font-size: 9px !important; padding: 4px !important; color: black !important; }
-    
-    /* إزالة التثبيت عند الطباعة لمنع قص الأعمدة */
     .sticky-col-1, .sticky-col-2, .sticky-col-3, thead th { position: static !important; box-shadow: none !important; }
-    
     #global-tooltip { display: none !important; }
-    
-    /* طباعة قائمة العقود */
     .page-section.active .cards-grid { display: block !important; }
     .page-section.active .data-card { border: 1px solid #000; margin-bottom: 10px; break-inside: avoid; box-shadow: none; }
     .page-section.active .card-actions { display: none !important; }
+    /* إخفاء تابات السنين في الطباعة */
+    .year-tabs-container { display: none !important; }
 }
