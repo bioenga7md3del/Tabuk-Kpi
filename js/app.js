@@ -5,7 +5,7 @@ import * as UI from "./ui.js";
 // Global State
 window.appData = { contractors: {}, contracts: {}, monthNames: [] };
 window.userRole = null;
-window.selectedYear = new Date().getFullYear(); // الافتراضي: السنة الحالية
+window.selectedYear = new Date().getFullYear(); 
 window.appPasswords = { super: '1234', medical: '1111', non_medical: '2222' };
 
 UI.initTooltip();
@@ -26,15 +26,9 @@ DB.listenToData((data) => {
 DB.listenToPasswords((pass) => window.appPasswords = pass);
 
 function refreshView() {
-    // 1. رسم تابات السنين أولاً
     UI.renderYearTabs(window.appData.contracts, window.selectedYear);
-
-    // 2. رسم الجدول بناءً على السنة المختارة
-    // (نمرر window.selectedYear للدالة)
     const rows = UI.renderTable(window.appData, window.userRole, Auth.canEdit, window.selectedYear);
-    
-    // 3. تحديث الإحصائيات
-    UI.updateStats(rows, window.appData);
+    UI.updateStats(rows, window.appData, window.selectedYear);
     
     if (window.userRole && window.userRole !== 'viewer') {
         UI.renderCards(window.appData, 'contract');
@@ -44,18 +38,11 @@ function refreshView() {
 
 // --- Global Binding ---
 window.renderTable = refreshView;
-
-// دالة جديدة لتغيير السنة عند الضغط على التاب
-window.selectYear = function(year) {
-    window.selectedYear = year;
-    refreshView();
-};
-
+window.selectYear = function(year) { window.selectedYear = year; refreshView(); };
 window.renderContractsCards = function() { UI.renderCards(window.appData, 'contract'); };
 window.showTooltip = UI.showTooltip;
 window.hideTooltip = UI.hideTooltip;
 window.exportToExcel = UI.exportToExcel;
-
 window.switchView = function(viewId) {
     document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -76,7 +63,6 @@ window.adminLogin = async function() {
     document.getElementById('loginBtn').classList.add('hidden');
     document.getElementById('logoutBtn').classList.remove('hidden');
     document.getElementById('roleDisplay').innerText = res.name;
-    
     const isSuper = window.userRole === 'super';
     const isViewer = window.userRole === 'viewer';
     document.querySelectorAll('.super-admin-only').forEach(el => el.style.display = isSuper ? 'inline-block' : 'none');
@@ -142,16 +128,55 @@ window.prepareEditContractor = function(id, name) {
 window.deleteContract = async (id) => { if((await Swal.fire({title:'حذف؟',icon:'warning',showCancelButton:true})).isConfirmed) DB.deleteContract(id); };
 window.deleteContractor = function(id) { const has = Object.values(window.appData.contracts).some(c => c.contractorId === id); if(has) Swal.fire('لا','مرتبط بعقود','error'); else DB.deleteContractor(id); };
 
+// --- ✅ Popup for Month Details (Core Functionality Restored) ---
 window.handleKpiCell = async function(cid, midx) {
     if (!Auth.canEdit(window.userRole, window.appData.contracts[cid].type)) return;
+    
+    // Get the month data using the original index passed from renderTable
     const m = window.appData.contracts[cid].months[midx];
     if(!m) return UI.showToast("حدث الشهور أولاً");
+    
     const {value:v} = await Swal.fire({
         title: window.appData.monthNames[midx],
-        html: `<select id="sw-st" class="form-control"><option value="late" ${m.financeStatus==='late'?'selected':''}>متأخر</option><option value="sent" ${m.financeStatus==='sent'?'selected':''}>تم الرفع</option><option value="returned" ${m.financeStatus==='returned'?'selected':''}>إعادة</option></select><input id="sw-cn" class="form-control" placeholder="رقم المطالبة" value="${m.claimNum||''}" style="margin:5px 0"><input id="sw-ln" class="form-control" placeholder="رقم الخطاب" value="${m.letterNum||''}" style="margin:5px 0"><input id="sw-dt" class="form-control" type="date" value="${m.submissionDate||''}" style="margin:5px 0"><input id="sw-nt" class="form-control" placeholder="ملاحظات" value="${m.returnNotes||''}" style="margin:5px 0">`,
-        preConfirm: () => ({ financeStatus:document.getElementById('sw-st').value, claimNum:document.getElementById('sw-cn').value, letterNum:document.getElementById('sw-ln').value, submissionDate:document.getElementById('sw-dt').value, returnNotes:document.getElementById('sw-nt').value })
+        html: `
+            <label style="display:block;text-align:right;margin-bottom:5px">الحالة:</label>
+            <select id="sw-st" class="form-control" style="margin-bottom:10px">
+                <option value="late" ${m.financeStatus==='late'?'selected':''}>❌ متأخر</option>
+                <option value="sent" ${m.financeStatus==='sent'?'selected':''}>✅ تم رفعه للمالية</option>
+                <option value="returned" ${m.financeStatus==='returned'?'selected':''}>⚠️ تم إرجاعه</option>
+            </select>
+            
+            <label style="display:block;text-align:right;margin-bottom:5px">رقم المطالبة:</label>
+            <input id="sw-cn" class="form-control" placeholder="رقم المطالبة" value="${m.claimNum||''}" style="margin-bottom:10px">
+            
+            <label style="display:block;text-align:right;margin-bottom:5px">رقم الخطاب:</label>
+            <input id="sw-ln" class="form-control" placeholder="رقم الخطاب" value="${m.letterNum||''}" style="margin-bottom:10px">
+            
+            <label style="display:block;text-align:right;margin-bottom:5px">تاريخ الخطاب:</label>
+            <input id="sw-dt" class="form-control" type="date" value="${m.submissionDate||''}" style="margin-bottom:10px">
+            
+            <label style="display:block;text-align:right;margin-bottom:5px">ملاحظات / سبب الإرجاع:</label>
+            <input id="sw-nt" class="form-control" placeholder="ملاحظات" value="${m.returnNotes||''}">
+        `,
+        focusConfirm: false,
+        preConfirm: () => ({ 
+            financeStatus: document.getElementById('sw-st').value, 
+            claimNum: document.getElementById('sw-cn').value, 
+            letterNum: document.getElementById('sw-ln').value, 
+            submissionDate: document.getElementById('sw-dt').value, 
+            returnNotes: document.getElementById('sw-nt').value 
+        })
     });
-    if(v) DB.updateMonthStatus(cid, midx, v).then(() => { window.appData.contracts[cid].months[midx] = v; refreshView(); UI.showToast("تم"); });
+    
+    if(v) {
+        // Save to Database
+        DB.updateMonthStatus(cid, midx, v).then(() => { 
+            // Update local state immediately for fast response
+            window.appData.contracts[cid].months[midx] = v; 
+            refreshView(); 
+            UI.showToast("تم الحفظ"); 
+        });
+    }
 };
 
 window.editNote = async function(cid) {
@@ -160,14 +185,12 @@ window.editNote = async function(cid) {
     if(t!==undefined) DB.updateContract(cid, {notes:t});
 };
 
-// --- الدالة المحدثة والآمنة لتحديث الشهور ---
+// --- Smart Refresh Months System (Detects older years) ---
 window.refreshMonthsSystem = async function() {
     if(!window.userRole) return;
-    
-    // تأكيد من المستخدم
     const result = await Swal.fire({
         title: 'تحديث هيكل الشهور؟',
-        text: "سيتم إنشاء وتحديث الشهور من 2024 وحتى اليوم.",
+        text: "سيتم إنشاء الشهور من أقدم عقد وحتى اليوم.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'نعم، تحديث',
@@ -176,14 +199,21 @@ window.refreshMonthsSystem = async function() {
 
     if(!result.isConfirmed) return;
 
-    // 1. تحديد البداية والنهاية
-    const startDate = new Date(2024, 0, 1); // 1 يناير 2024
-    const now = new Date(); // اليوم
+    let minYear = 2024;
+    const contracts = window.appData.contracts || {};
+    Object.values(contracts).forEach(c => {
+        if (c.startDate) {
+            const y = new Date(c.startDate).getFullYear();
+            if (y < minYear) minYear = y;
+        }
+    });
+
+    const startDate = new Date(minYear, 0, 1);
+    const now = new Date();
     
     const arM = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
     let mNames = [];
 
-    // 2. توليد قائمة الشهور التراكمية
     let current = new Date(startDate);
     while (current <= now) {
         let mIndex = current.getMonth();
@@ -191,35 +221,23 @@ window.refreshMonthsSystem = async function() {
         mNames.push(`${arM[mIndex]} ${y}`);
         current.setMonth(current.getMonth() + 1);
     }
-    mNames.reverse(); // الأحدث أولاً
+    mNames.reverse();
     
-    // 3. تحديث القائمة في قاعدة البيانات
     await DB.updateMonthsList(mNames);
 
-    // 4. تحديث مصفوفات الشهور داخل كل عقد (دون مسح القديم)
     const updates = {};
-    Object.entries(window.appData.contracts).forEach(([id, c]) => {
+    Object.entries(contracts).forEach(([id, c]) => {
         const oldMonths = c.months || [];
-        
-        // إذا كان عدد الشهور في النظام أكبر من عدد الشهور في العقد
-        // نضيف خانات "late" جديدة للفرق، ونحتفظ بالقديم
         if (oldMonths.length < mNames.length) {
             const diff = mNames.length - oldMonths.length;
-            
-            // لأن المصفوفة معكوسة (الأحدث index 0)، العناصر الجديدة تضاف في البداية
             const extension = new Array(diff).fill({status: "late", financeStatus: "late"});
-            
-            // دمج الجديد مع القديم
-            updates[`app_db_v2/contracts/${id}/months`] = [...extension, ...oldMonths];
+            // Add extension to the END (since we reversed the list, older months are at the end)
+            updates[`app_db_v2/contracts/${id}/months`] = [...oldMonths, ...extension];
         }
     });
     
-    // تنفيذ التحديثات إن وجدت
-    if(Object.keys(updates).length > 0) {
-        await DB.update(DB.ref(DB.db), updates);
-    }
-    
-    UI.showToast("تم التحديث (2024 - الآن)");
+    if(Object.keys(updates).length > 0) await DB.update(DB.ref(DB.db), updates);
+    UI.showToast(`تم التحديث (من ${minYear})`);
     setTimeout(() => location.reload(), 1500);
 };
 
