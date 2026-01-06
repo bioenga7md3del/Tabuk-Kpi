@@ -5,11 +5,12 @@ import * as UI from "./ui.js";
 // Global State
 window.appData = { contractors: {}, contracts: {}, monthNames: [] };
 window.userRole = null;
-window.selectedYear = new Date().getFullYear(); 
+window.selectedYear = new Date().getFullYear(); // السنة الافتراضية: الحالية
 window.appPasswords = { super: '1234', medical: '1111', non_medical: '2222' };
 
 UI.initTooltip();
 
+// 1. الاستماع للبيانات
 DB.listenToData((data) => {
     document.getElementById('loader').style.display = 'none';
     if (data) {
@@ -25,9 +26,15 @@ DB.listenToData((data) => {
 
 DB.listenToPasswords((pass) => window.appPasswords = pass);
 
+// 2. دالة تحديث العرض
 function refreshView() {
+    // رسم التابات
     UI.renderYearTabs(window.appData.contracts, window.selectedYear);
+    
+    // رسم الجدول للسنة المختارة
     const rows = UI.renderTable(window.appData, window.userRole, Auth.canEdit, window.selectedYear);
+    
+    // تحديث الإحصائيات للسنة المختارة
     UI.updateStats(rows, window.appData, window.selectedYear);
     
     if (window.userRole && window.userRole !== 'viewer') {
@@ -36,13 +43,14 @@ function refreshView() {
     }
 }
 
-// --- Global Binding ---
+// --- Global Binding (ربط الدوال بالـ HTML) ---
 window.renderTable = refreshView;
 window.selectYear = function(year) { window.selectedYear = year; refreshView(); };
 window.renderContractsCards = function() { UI.renderCards(window.appData, 'contract'); };
 window.showTooltip = UI.showTooltip;
 window.hideTooltip = UI.hideTooltip;
 window.exportToExcel = UI.exportToExcel;
+
 window.switchView = function(viewId) {
     document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -128,19 +136,25 @@ window.prepareEditContractor = function(id, name) {
 window.deleteContract = async (id) => { if((await Swal.fire({title:'حذف؟',icon:'warning',showCancelButton:true})).isConfirmed) DB.deleteContract(id); };
 window.deleteContractor = function(id) { const has = Object.values(window.appData.contracts).some(c => c.contractorId === id); if(has) Swal.fire('لا','مرتبط بعقود','error'); else DB.deleteContractor(id); };
 
-// --- ✅ Popup for Month Details (PROTECTED) ---
+// --- ✅ تعديل شهر (نسخة محمية من الأخطاء) ---
 window.handleKpiCell = async function(cid, midx) {
     if (!Auth.canEdit(window.userRole, window.appData.contracts[cid].type)) return;
     
-    // --- Crash Protection ---
+    // جلب العقد
     const contract = window.appData.contracts[cid];
+    if (!contract) return UI.showToast("خطأ: العقد غير موجود");
+
+    // --- الحماية من الانهيار ---
     if (!contract.months) contract.months = [];
-    if (!contract.months[midx]) contract.months[midx] = { financeStatus: 'late', status: 'late' };
-    
+    if (!contract.months[midx]) {
+        contract.months[midx] = { financeStatus: 'late', status: 'late' };
+    }
+
     const m = contract.months[midx];
+    const monthName = window.appData.monthNames[midx] || "تحديث الحالة";
     
     const {value:v} = await Swal.fire({
-        title: window.appData.monthNames[midx] || "تحديث الحالة",
+        title: monthName,
         html: `
             <label style="display:block;text-align:right;margin-bottom:5px">الحالة:</label>
             <select id="sw-st" class="form-control" style="margin-bottom:10px">
@@ -174,7 +188,7 @@ window.handleKpiCell = async function(cid, midx) {
     if(v) {
         try {
             await DB.updateMonthStatus(cid, midx, v);
-            contract.months[midx] = v; 
+            contract.months[midx] = v; // تحديث محلي
             refreshView(); 
             UI.showToast("تم الحفظ"); 
         } catch (error) {
@@ -190,12 +204,13 @@ window.editNote = async function(cid) {
     if(t!==undefined) DB.updateContract(cid, {notes:t});
 };
 
-// --- Smart Refresh Months System ---
+// --- 🔥🔥🔥 Smart Refresh (يمنع ترحيل البيانات) 🔥🔥🔥 ---
 window.refreshMonthsSystem = async function() {
     if(!window.userRole) return;
+    
     const result = await Swal.fire({
-        title: 'تحديث هيكل الشهور؟',
-        text: "سيتم إنشاء الشهور من أقدم عقد وحتى اليوم.",
+        title: 'تحديث وإعادة هيكلة الشهور؟',
+        text: "سيتم ترتيب الشهور بناءً على الأسماء (لن تضيع البيانات القديمة).",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'نعم، تحديث',
@@ -204,6 +219,7 @@ window.refreshMonthsSystem = async function() {
 
     if(!result.isConfirmed) return;
 
+    // 1. تحديد أقدم سنة
     let minYear = 2024;
     const contracts = window.appData.contracts || {};
     Object.values(contracts).forEach(c => {
@@ -213,35 +229,61 @@ window.refreshMonthsSystem = async function() {
         }
     });
 
-    const startDate = new Date(minYear, 0, 1);
-    const now = new Date();
+    const startDate = new Date(minYear, 0, 1); // 1 يناير من أقدم سنة
+    const now = new Date(); // اليوم
     
     const arM = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
-    let mNames = [];
+    let newMonthNames = [];
 
+    // 2. توليد قائمة الشهور الجديدة (من الأقدم للأحدث ثم نعكسها)
     let current = new Date(startDate);
     while (current <= now) {
         let mIndex = current.getMonth();
         let y = current.getFullYear();
-        mNames.push(`${arM[mIndex]} ${y}`);
+        newMonthNames.push(`${arM[mIndex]} ${y}`);
         current.setMonth(current.getMonth() + 1);
     }
-    mNames.reverse();
+    newMonthNames.reverse(); // النتيجة: [يناير 2026, ..., يناير 2025, ..., يناير 2020]
     
-    await DB.updateMonthsList(mNames);
+    // حفظ أسماء الشهور القديمة (للمقارنة)
+    const oldMonthNames = window.appData.monthNames || [];
 
     const updates = {};
+    
+    // تحديث قائمة الأسماء في DB
+    updates['app_db_v2/monthNames'] = newMonthNames;
+
+    // 3. إعادة توزيع بيانات العقود
     Object.entries(contracts).forEach(([id, c]) => {
-        const oldMonths = c.months || [];
-        if (oldMonths.length < mNames.length) {
-            const diff = mNames.length - oldMonths.length;
-            const extension = new Array(diff).fill({status: "late", financeStatus: "late"});
-            updates[`app_db_v2/contracts/${id}/months`] = [...oldMonths, ...extension];
-        }
+        // التأكد أن البيانات مصفوفة
+        const oldMonths = Array.isArray(c.months) ? c.months : [];
+        
+        // إنشاء مصفوفة جديدة فارغة بحجم الشهور الجديدة
+        const newMonthsData = new Array(newMonthNames.length).fill(null).map(() => ({
+            status: "late", 
+            financeStatus: "late"
+        }));
+
+        // 🌟 السحر هنا: نقل البيانات بناءً على "الاسم" وليس "المكان"
+        oldMonthNames.forEach((oldName, oldIdx) => {
+            // هل هذا الشهر القديم موجود في القائمة الجديدة؟
+            const newIdx = newMonthNames.indexOf(oldName);
+            
+            // إذا وجدناه، وكان له بيانات، انسخها في مكانها الجديد
+            if (newIdx !== -1 && oldMonths[oldIdx]) {
+                newMonthsData[newIdx] = oldMonths[oldIdx];
+            }
+        });
+
+        updates[`app_db_v2/contracts/${id}/months`] = newMonthsData;
     });
     
-    if(Object.keys(updates).length > 0) await DB.update(DB.ref(DB.db), updates);
-    UI.showToast(`تم التحديث (من ${minYear})`);
+    // تنفيذ التحديث في فيربيز
+    if(Object.keys(updates).length > 0) {
+        await DB.update(DB.ref(DB.db), updates);
+    }
+    
+    UI.showToast(`تم التحديث بنجاح`);
     setTimeout(() => location.reload(), 1500);
 };
 
