@@ -66,7 +66,7 @@ export function renderYearTabs(contracts, selectedYear) {
     container.style.display = 'flex';
 }
 
-// --- 4. Render Table (FIXED CLICK AREA) ---
+// --- 4. Render Table (Click Area Fixed) ---
 export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
@@ -78,7 +78,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
 
     if (!tbody || !hRow) return;
 
-    // Filter Columns
+    // Filter Columns based on selected year
     const filteredColumns = []; 
     if (monthNames && monthNames.length) {
         monthNames.forEach((mName, originalIndex) => {
@@ -86,7 +86,6 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         });
     }
 
-    // Header
     let hHTML = `<th class="sticky-col-1">اسم العقد</th><th class="sticky-col-2">النوع</th><th class="sticky-col-3">المقاول</th><th style="min-width:40px">تأخير</th>`;
     if (filteredColumns.length > 0) filteredColumns.forEach(col => hHTML += `<th style="min-width:100px">${col.name}</th>`);
     else hHTML += `<th>-</th>`;
@@ -102,11 +101,13 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         const cName = contractors[r.contractorId]?.name || "";
         const cTitle = r.contractName || r.hospital || "";
         const hasClaim = sClaim === "" || (r.months || []).some(m => m.claimNum && m.claimNum.toLowerCase().includes(sClaim));
+        
         let showContract = true;
         if (r.startDate) {
             const startYear = new Date(r.startDate).getFullYear();
             if (startYear > selectedYear) showContract = false;
         }
+
         return (cTitle).toLowerCase().includes(sHosp) && cName.toLowerCase().includes(sCont) && (filter === 'all' || r.type === filter) && hasClaim && showContract;
     });
 
@@ -142,7 +143,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 
                 const highlight = (sClaim !== "" && md.claimNum && md.claimNum.toLowerCase().includes(sClaim)) ? "border: 2px solid blue;" : "";
                 
-                // --- التعديل هنا: وضع الـ onclick على الـ td مباشرة ---
+                // --- FIX: onclick on TD ---
                 const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
                 const cursor = canEditFunc(userRole, row.type) ? 'pointer' : 'default';
 
@@ -165,9 +166,7 @@ export function renderCards(appData, type) {
     const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
     if (!grid) return;
     grid.innerHTML = '';
-    
-    // ... (نفس كود الكروت الذي لديك - لم يتغير) ...
-    // اختصاراً، احتفظ بالكود القديم هنا لـ renderCards لأنه سليم
+
     if (type === 'contract') {
         const fName = document.getElementById('filterContractName')?.value.toLowerCase() || "";
         const fStatus = document.getElementById('filterContractStatus')?.value || "all";
@@ -224,18 +223,15 @@ export function renderCards(appData, type) {
 // --- 6. Update Stats (Smart Version) ---
 export function updateStats(rows, appData, selectedYear) {
     if (!rows || !appData) return;
-    
     const validIndices = [];
     if (appData.monthNames) {
         appData.monthNames.forEach((m, i) => {
             if (m.includes(selectedYear)) validIndices.push(i);
         });
     }
-
     let totalLate = 0, totalSubmitted = 0;
     const totalCells = rows.length * validIndices.length;
     let active = 0, expired = 0;
-
     rows.forEach(r => {
         const st = getContractStatus(r.startDate, r.endDate);
         if(st.text === 'ساري' || st.text === 'على وشك الانتهاء') active++;
@@ -250,7 +246,6 @@ export function updateStats(rows, appData, selectedYear) {
             });
         }
     });
-    
     const elHosp = document.getElementById('countHospitals'); if (elHosp) elHosp.innerText = new Set(rows.map(r=>r.hospital)).size;
     const elCont = document.getElementById('countContracts'); if (elCont) elCont.innerText = rows.length;
     const elLate = document.getElementById('countLate'); if (elLate) elLate.innerText = totalLate;
