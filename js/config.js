@@ -1,18 +1,20 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-import { getDatabase } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+// js/config.js
+// تحديث المكتبات للإصدار 10.7.1 لتتوافق مع باقي ملفاتك
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyAP-wgrP2o6ifi3XuaMK-lBB43nvrs3GfA",
-    authDomain: "tabuk-kpi.firebaseapp.com",
-    projectId: "tabuk-kpi",
-    storageBucket: "tabuk-kpi.firebasestorage.app",
-    messagingSenderId: "537604438384",
-    appId: "1:537604438384:web:4391b219241c54f7d6f7b5",
-    measurementId: "G-9FCG4452CQ"
+    apiKey: "AIzaSyAyq5cYOWnLp1VuYKRZ_EDl03BYroaVBVI",
+    authDomain: "tabuk-kpi-restore.firebaseapp.com",
+    databaseURL: "https://tabuk-kpi-restore-default-rtdb.firebaseio.com",
+    projectId: "tabuk-kpi-restore",
+    storageBucket: "tabuk-kpi-restore.firebasestorage.app",
+    messagingSenderId: "451669399138",
+    appId: "1:451669399138:web:ce2567c7c02024d7ffa33b",
+    measurementId: "G-R636S5F3DV"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// تصدير المتغيرات لنستخدمها في الملفات الأخرى
 export { db };
