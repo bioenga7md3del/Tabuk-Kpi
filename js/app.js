@@ -128,16 +128,29 @@ window.prepareEditContractor = function(id, name) {
 window.deleteContract = async (id) => { if((await Swal.fire({title:'حذف؟',icon:'warning',showCancelButton:true})).isConfirmed) DB.deleteContract(id); };
 window.deleteContractor = function(id) { const has = Object.values(window.appData.contracts).some(c => c.contractorId === id); if(has) Swal.fire('لا','مرتبط بعقود','error'); else DB.deleteContractor(id); };
 
-// --- ✅ Popup for Month Details (Core Functionality Restored) ---
+// --- ✅ Popup for Month Details (PROTECTED VERSION) ---
 window.handleKpiCell = async function(cid, midx) {
     if (!Auth.canEdit(window.userRole, window.appData.contracts[cid].type)) return;
     
-    // Get the month data using the original index passed from renderTable
-    const m = window.appData.contracts[cid].months[midx];
-    if(!m) return UI.showToast("حدث الشهور أولاً");
+    // --- الحماية من الخطأ (Defensive Coding) ---
+    const contract = window.appData.contracts[cid];
     
+    // 1. إذا لم تكن مصفوفة الشهور موجودة، قم بإنشائها
+    if (!contract.months) {
+        contract.months = [];
+    }
+    
+    // 2. إذا لم يكن الشهر المحدد موجوداً، قم بإنشائه ببيانات افتراضية
+    if (!contract.months[midx]) {
+        contract.months[midx] = { financeStatus: 'late', status: 'late' };
+    }
+
+    // الآن يمكننا استدعاء الشهر بأمان
+    const m = contract.months[midx];
+    
+    // عرض النافذة
     const {value:v} = await Swal.fire({
-        title: window.appData.monthNames[midx],
+        title: window.appData.monthNames[midx] || "تحديث الحالة",
         html: `
             <label style="display:block;text-align:right;margin-bottom:5px">الحالة:</label>
             <select id="sw-st" class="form-control" style="margin-bottom:10px">
@@ -169,10 +182,10 @@ window.handleKpiCell = async function(cid, midx) {
     });
     
     if(v) {
-        // Save to Database
+        // حفظ في قاعدة البيانات
         DB.updateMonthStatus(cid, midx, v).then(() => { 
-            // Update local state immediately for fast response
-            window.appData.contracts[cid].months[midx] = v; 
+            // تحديث محلي سريع
+            contract.months[midx] = v; 
             refreshView(); 
             UI.showToast("تم الحفظ"); 
         });
@@ -185,7 +198,7 @@ window.editNote = async function(cid) {
     if(t!==undefined) DB.updateContract(cid, {notes:t});
 };
 
-// --- Smart Refresh Months System (Detects older years) ---
+// --- Smart Refresh Months System ---
 window.refreshMonthsSystem = async function() {
     if(!window.userRole) return;
     const result = await Swal.fire({
@@ -231,7 +244,6 @@ window.refreshMonthsSystem = async function() {
         if (oldMonths.length < mNames.length) {
             const diff = mNames.length - oldMonths.length;
             const extension = new Array(diff).fill({status: "late", financeStatus: "late"});
-            // Add extension to the END (since we reversed the list, older months are at the end)
             updates[`app_db_v2/contracts/${id}/months`] = [...oldMonths, ...extension];
         }
     });
