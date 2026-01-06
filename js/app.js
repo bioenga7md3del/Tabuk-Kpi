@@ -128,27 +128,17 @@ window.prepareEditContractor = function(id, name) {
 window.deleteContract = async (id) => { if((await Swal.fire({title:'حذف؟',icon:'warning',showCancelButton:true})).isConfirmed) DB.deleteContract(id); };
 window.deleteContractor = function(id) { const has = Object.values(window.appData.contracts).some(c => c.contractorId === id); if(has) Swal.fire('لا','مرتبط بعقود','error'); else DB.deleteContractor(id); };
 
-// --- ✅ Popup for Month Details (PROTECTED VERSION) ---
+// --- ✅ Popup for Month Details (PROTECTED) ---
 window.handleKpiCell = async function(cid, midx) {
     if (!Auth.canEdit(window.userRole, window.appData.contracts[cid].type)) return;
     
-    // --- الحماية من الخطأ (Defensive Coding) ---
+    // --- Crash Protection ---
     const contract = window.appData.contracts[cid];
+    if (!contract.months) contract.months = [];
+    if (!contract.months[midx]) contract.months[midx] = { financeStatus: 'late', status: 'late' };
     
-    // 1. إذا لم تكن مصفوفة الشهور موجودة، قم بإنشائها
-    if (!contract.months) {
-        contract.months = [];
-    }
-    
-    // 2. إذا لم يكن الشهر المحدد موجوداً، قم بإنشائه ببيانات افتراضية
-    if (!contract.months[midx]) {
-        contract.months[midx] = { financeStatus: 'late', status: 'late' };
-    }
-
-    // الآن يمكننا استدعاء الشهر بأمان
     const m = contract.months[midx];
     
-    // عرض النافذة
     const {value:v} = await Swal.fire({
         title: window.appData.monthNames[midx] || "تحديث الحالة",
         html: `
@@ -182,13 +172,15 @@ window.handleKpiCell = async function(cid, midx) {
     });
     
     if(v) {
-        // حفظ في قاعدة البيانات
-        DB.updateMonthStatus(cid, midx, v).then(() => { 
-            // تحديث محلي سريع
+        try {
+            await DB.updateMonthStatus(cid, midx, v);
             contract.months[midx] = v; 
             refreshView(); 
             UI.showToast("تم الحفظ"); 
-        });
+        } catch (error) {
+            console.error(error);
+            UI.showToast("حدث خطأ أثناء الحفظ");
+        }
     }
 };
 
