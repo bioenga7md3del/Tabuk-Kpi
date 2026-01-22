@@ -1,6 +1,6 @@
 // js/ui.js
 
-// --- 1. Tooltip ---
+// --- 1. Tooltip (نظام التلميحات) ---
 export function initTooltip() {
     if (!document.getElementById('global-tooltip')) {
         const div = document.createElement('div');
@@ -21,7 +21,7 @@ export function showTooltip(e, text) {
 }
 export function hideTooltip() { const t = document.getElementById('global-tooltip'); if (t) t.style.display = 'none'; }
 
-// --- 2. Contract Status ---
+// --- 2. Contract Status (حالة العقد الزمنية) ---
 function getContractStatus(start, end) {
     if(!start || !end) return { text: "غير محدد", badge: "badge-grey", is_active: false };
     const today = new Date(); today.setHours(0,0,0,0);
@@ -34,14 +34,15 @@ function getContractStatus(start, end) {
     return { text: "ساري", badge: "badge-green", is_active: true };
 }
 
-// --- 3. Render Year Tabs ---
+// --- 3. Render Year Tabs (رسم تابات السنوات) ---
 export function renderYearTabs(contracts, selectedYear) {
     const container = document.getElementById('yearTabs');
     if (!container) return;
 
     const currentYear = new Date().getFullYear();
-    let minYear = 2024; 
+    let minYear = 2024; // الافتراضي
 
+    // البحث عن أقدم سنة عقد
     if (contracts) {
         Object.values(contracts).forEach(c => {
             if (c.startDate) {
@@ -66,7 +67,7 @@ export function renderYearTabs(contracts, selectedYear) {
     container.style.display = 'flex';
 }
 
-// --- 4. Render Table (Click Area Fixed) ---
+// --- 4. Render Table (رسم الجدول - مع منطق الحساب الذكي) ---
 export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
@@ -78,7 +79,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
 
     if (!tbody || !hRow) return;
 
-    // Filter Columns based on selected year
+    // تصفية الأعمدة بناءً على السنة المختارة
     const filteredColumns = []; 
     if (monthNames && monthNames.length) {
         monthNames.forEach((mName, originalIndex) => {
@@ -86,6 +87,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         });
     }
 
+    // رسم الهيدر
     let hHTML = `<th class="sticky-col-1">اسم العقد</th><th class="sticky-col-2">النوع</th><th class="sticky-col-3">المقاول</th><th style="min-width:40px">تأخير</th>`;
     if (filteredColumns.length > 0) filteredColumns.forEach(col => hHTML += `<th style="min-width:100px">${col.name}</th>`);
     else hHTML += `<th>-</th>`;
@@ -96,7 +98,9 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
     if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="15" style="padding:20px;color:#777">لا توجد بيانات</td></tr>`; return []; }
 
-    // Filter Rows
+    const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+
+    // تصفية الصفوف
     const filtered = rows.filter(r => {
         const cName = contractors[r.contractorId]?.name || "";
         const cTitle = r.contractName || r.hospital || "";
@@ -116,7 +120,32 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     filtered.forEach(row => {
         const cName = contractors[row.contractorId]?.name || "غير معروف";
         const cTitle = row.contractName || row.hospital || "بدون اسم";
-        const late = (row.months||[]).filter(m => m && m.financeStatus === 'late').length;
+        
+        // --- ✅ 1. الحساب الذكي للتأخير (يتجاهل ما قبل العقد) ---
+        let late = 0;
+        if (row.months && monthNames) {
+            const contractStartDate = new Date(row.startDate);
+            contractStartDate.setDate(1); 
+            contractStartDate.setHours(0,0,0,0);
+
+            row.months.forEach((m, idx) => {
+                const mName = monthNames[idx];
+                if (!mName || !m) return;
+
+                const [mAr, mYear] = mName.split(' ');
+                const mIdx = arMonths.indexOf(mAr);
+                
+                if (mIdx > -1) {
+                    const cellDate = new Date(parseInt(mYear), mIdx, 1);
+                    // الشرط: نحسب التأخير فقط إذا كان تاريخ العمود >= تاريخ بداية العقد
+                    if (cellDate >= contractStartDate && m.financeStatus === 'late') {
+                        late++;
+                    }
+                }
+            });
+        }
+        // --------------------------------------------------------
+
         const badge = late > 0 ? 'badge-red' : 'badge-green';
         let valFmt = row.value ? Number(row.value).toLocaleString() : '-';
         const st = getContractStatus(row.startDate, row.endDate);
@@ -137,17 +166,41 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 const originalIndex = col.index;
                 const md = (row.months && row.months[originalIndex]) ? row.months[originalIndex] : {financeStatus:'late'};
                 
-                let ic='✘', cl='status-late', ti='لم يرفع';
-                if(md.financeStatus === 'sent') { ic='✅'; cl='status-ok'; ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}`; }
-                else if(md.financeStatus === 'returned') { ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}`; }
+                // --- ✅ 2. فحص تاريخ الخلية لرسمها بشكل مختلف ---
+                const mName = col.name;
+                const [mAr, mYear] = mName.split(' ');
+                const mIdx = arMonths.indexOf(mAr);
+                const cellDate = new Date(parseInt(mYear), mIdx, 1);
                 
+                const contractStartDate = new Date(row.startDate);
+                contractStartDate.setDate(1); 
+                contractStartDate.setHours(0,0,0,0);
+                
+                const isBeforeContract = cellDate < contractStartDate;
+                // ------------------------------------------------
+
+                let ic='✘', cl='status-late', ti='لم يرفع';
+                
+                if(md.financeStatus === 'sent') { 
+                    ic='✅'; cl='status-ok'; ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}`; 
+                }
+                else if(md.financeStatus === 'returned') { 
+                    ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}`; 
+                }
+                else if (isBeforeContract) { 
+                    ic='-'; cl=''; ti='قبل بداية العقد'; // مظهر خاص للشهور القديمة
+                }
+
                 const highlight = (sClaim !== "" && md.claimNum && md.claimNum.toLowerCase().includes(sClaim)) ? "border: 2px solid blue;" : "";
                 
-                // --- FIX: onclick on TD ---
+                // تفعيل النقر فقط إذا لم يكن قبل العقد (اختياري، هنا تركناه مفعل للتعديل اليدوي لو لزم الأمر)
                 const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
                 const cursor = canEditFunc(userRole, row.type) ? 'pointer' : 'default';
 
-                tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}; ${highlight}" ${clickAttr}>
+                // ستايل خاص للخلفية الرمادية
+                const bgStyle = isBeforeContract ? 'background:#f9f9f9; color:#ccc;' : '';
+
+                tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}; ${highlight}; ${bgStyle}" ${clickAttr}>
                     <div onmousemove="window.showTooltip(event, '${ti.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()">${ic}</div>
                 </td>`;
             });
@@ -161,7 +214,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     return filtered;
 }
 
-// --- 5. Render Cards ---
+// --- 5. Render Cards (رسم الكروت) ---
 export function renderCards(appData, type) {
     const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
     if (!grid) return;
@@ -220,7 +273,7 @@ export function renderCards(appData, type) {
     }
 }
 
-// --- 6. Update Stats (Smart Version) ---
+// --- 6. Update Stats (تحديث الإحصائيات بدقة) ---
 export function updateStats(rows, appData, selectedYear) {
     if (!rows || !appData) return;
     const validIndices = [];
@@ -230,32 +283,55 @@ export function updateStats(rows, appData, selectedYear) {
         });
     }
     let totalLate = 0, totalSubmitted = 0;
-    const totalCells = rows.length * validIndices.length;
+    
+    // --- منطق التجاهل في الإحصائيات أيضاً ---
+    const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    let effectiveTotalCells = 0;
+
+    rows.forEach(r => {
+        const contractStartDate = new Date(r.startDate);
+        contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
+
+        if (r.months) {
+            validIndices.forEach(idx => {
+                const mName = appData.monthNames[idx];
+                const [mAr, mYear] = mName.split(' ');
+                const mIdx = arMonths.indexOf(mAr);
+                const cellDate = new Date(parseInt(mYear), mIdx, 1);
+
+                // فقط إذا كان الشهر ضمن مدة العقد
+                if (cellDate >= contractStartDate) {
+                    effectiveTotalCells++;
+                    const m = r.months[idx];
+                    if (m) {
+                        if (m.financeStatus === 'late') totalLate++;
+                        if (m.financeStatus === 'sent') totalSubmitted++;
+                    }
+                }
+            });
+        }
+    });
+
     let active = 0, expired = 0;
     rows.forEach(r => {
         const st = getContractStatus(r.startDate, r.endDate);
         if(st.text === 'ساري' || st.text === 'على وشك الانتهاء') active++;
         if(st.text === 'منتهي') expired++;
-        if (r.months) {
-            validIndices.forEach(idx => {
-                const m = r.months[idx];
-                if (m) {
-                    if (m.financeStatus === 'late') totalLate++;
-                    if (m.financeStatus === 'sent') totalSubmitted++;
-                }
-            });
-        }
     });
+
     const elHosp = document.getElementById('countHospitals'); if (elHosp) elHosp.innerText = new Set(rows.map(r=>r.hospital)).size;
     const elCont = document.getElementById('countContracts'); if (elCont) elCont.innerText = rows.length;
     const elLate = document.getElementById('countLate'); if (elLate) elLate.innerText = totalLate;
     const elActive = document.getElementById('countActive'); if (elActive) elActive.innerText = active;
     const elExpired = document.getElementById('countExpired'); if (elExpired) elExpired.innerText = expired;
-    const elComp = document.getElementById('complianceRate'); if(elComp) elComp.innerText = totalCells > 0 ? Math.round((totalSubmitted/totalCells)*100)+'%' : '0%';
+    
+    // النسبة المئوية الدقيقة
+    const elComp = document.getElementById('complianceRate'); if(elComp) elComp.innerText = effectiveTotalCells > 0 ? Math.round((totalSubmitted/effectiveTotalCells)*100)+'%' : '0%';
+    
     const ctx = document.getElementById('kpiChart')?.getContext('2d');
     if (ctx) {
         if(window.myChart) window.myChart.destroy();
-        window.myChart = new Chart(ctx, { type: 'doughnut', data: { labels:['مرفوع','متأخر'], datasets:[{data:[totalSubmitted, totalCells-totalSubmitted], backgroundColor:['#27ae60','#c0392b']}] }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
+        window.myChart = new Chart(ctx, { type: 'doughnut', data: { labels:['مرفوع','متأخر'], datasets:[{data:[totalSubmitted, effectiveTotalCells-totalSubmitted], backgroundColor:['#27ae60','#c0392b']}] }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
     }
 }
 
