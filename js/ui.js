@@ -1,6 +1,6 @@
 // js/ui.js
 
-// --- 1. Tooltip (نظام التلميحات) ---
+// --- 1. Tooltip ---
 export function initTooltip() {
     if (!document.getElementById('global-tooltip')) {
         const div = document.createElement('div');
@@ -21,7 +21,7 @@ export function showTooltip(e, text) {
 }
 export function hideTooltip() { const t = document.getElementById('global-tooltip'); if (t) t.style.display = 'none'; }
 
-// --- 2. Contract Status (حالة العقد الزمنية) ---
+// --- 2. Contract Status ---
 function getContractStatus(start, end) {
     if(!start || !end) return { text: "غير محدد", badge: "badge-grey", is_active: false };
     const today = new Date(); today.setHours(0,0,0,0);
@@ -34,15 +34,14 @@ function getContractStatus(start, end) {
     return { text: "ساري", badge: "badge-green", is_active: true };
 }
 
-// --- 3. Render Year Tabs (رسم تابات السنوات) ---
+// --- 3. Render Year Tabs ---
 export function renderYearTabs(contracts, selectedYear) {
     const container = document.getElementById('yearTabs');
     if (!container) return;
 
     const currentYear = new Date().getFullYear();
-    let minYear = 2024; // الافتراضي
+    let minYear = 2024; 
 
-    // البحث عن أقدم سنة عقد
     if (contracts) {
         Object.values(contracts).forEach(c => {
             if (c.startDate) {
@@ -67,7 +66,7 @@ export function renderYearTabs(contracts, selectedYear) {
     container.style.display = 'flex';
 }
 
-// --- 4. Render Table (رسم الجدول - مع منطق الحساب الذكي) ---
+// --- 4. Render Table (تعديل الحساب: تجاهل الشهر الحالي) ---
 export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
@@ -79,7 +78,6 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
 
     if (!tbody || !hRow) return;
 
-    // تصفية الأعمدة بناءً على السنة المختارة
     const filteredColumns = []; 
     if (monthNames && monthNames.length) {
         monthNames.forEach((mName, originalIndex) => {
@@ -87,7 +85,6 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         });
     }
 
-    // رسم الهيدر
     let hHTML = `<th class="sticky-col-1">اسم العقد</th><th class="sticky-col-2">النوع</th><th class="sticky-col-3">المقاول</th><th style="min-width:40px">تأخير</th>`;
     if (filteredColumns.length > 0) filteredColumns.forEach(col => hHTML += `<th style="min-width:100px">${col.name}</th>`);
     else hHTML += `<th>-</th>`;
@@ -99,8 +96,11 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="15" style="padding:20px;color:#777">لا توجد بيانات</td></tr>`; return []; }
 
     const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    
+    // 🔥 تحديد بداية الشهر الحالي للمقارنة
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // تصفية الصفوف
     const filtered = rows.filter(r => {
         const cName = contractors[r.contractorId]?.name || "";
         const cTitle = r.contractName || r.hospital || "";
@@ -121,12 +121,11 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         const cName = contractors[row.contractorId]?.name || "غير معروف";
         const cTitle = row.contractName || row.hospital || "بدون اسم";
         
-        // --- ✅ 1. الحساب الذكي للتأخير (يتجاهل ما قبل العقد) ---
+        // --- ✅ حساب التأخير (الشهور المنتهية فقط) ---
         let late = 0;
         if (row.months && monthNames) {
             const contractStartDate = new Date(row.startDate);
-            contractStartDate.setDate(1); 
-            contractStartDate.setHours(0,0,0,0);
+            contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
 
             row.months.forEach((m, idx) => {
                 const mName = monthNames[idx];
@@ -137,14 +136,21 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 
                 if (mIdx > -1) {
                     const cellDate = new Date(parseInt(mYear), mIdx, 1);
-                    // الشرط: نحسب التأخير فقط إذا كان تاريخ العمود >= تاريخ بداية العقد
-                    if (cellDate >= contractStartDate && m.financeStatus === 'late') {
+                    
+                    // الشروط:
+                    // 1. الشهر داخل مدة العقد (cellDate >= contractStartDate)
+                    // 2. الشهر انتهى بالفعل (cellDate < currentMonthStart)
+                    // 3. الحالة هي متأخر
+                    
+                    const isEnded = cellDate < currentMonthStart;
+                    
+                    if (cellDate >= contractStartDate && isEnded && m.financeStatus === 'late') {
                         late++;
                     }
                 }
             });
         }
-        // --------------------------------------------------------
+        // ------------------------------------------------
 
         const badge = late > 0 ? 'badge-red' : 'badge-green';
         let valFmt = row.value ? Number(row.value).toLocaleString() : '-';
@@ -166,18 +172,16 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 const originalIndex = col.index;
                 const md = (row.months && row.months[originalIndex]) ? row.months[originalIndex] : {financeStatus:'late'};
                 
-                // --- ✅ 2. فحص تاريخ الخلية لرسمها بشكل مختلف ---
                 const mName = col.name;
                 const [mAr, mYear] = mName.split(' ');
                 const mIdx = arMonths.indexOf(mAr);
                 const cellDate = new Date(parseInt(mYear), mIdx, 1);
                 
                 const contractStartDate = new Date(row.startDate);
-                contractStartDate.setDate(1); 
-                contractStartDate.setHours(0,0,0,0);
+                contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
                 
                 const isBeforeContract = cellDate < contractStartDate;
-                // ------------------------------------------------
+                const isCurrentMonth = cellDate.getTime() === currentMonthStart.getTime();
 
                 let ic='✘', cl='status-late', ti='لم يرفع';
                 
@@ -188,17 +192,21 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                     ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}`; 
                 }
                 else if (isBeforeContract) { 
-                    ic='-'; cl=''; ti='قبل بداية العقد'; // مظهر خاص للشهور القديمة
+                    ic='-'; cl=''; ti='قبل بداية العقد';
+                }
+                else if (isCurrentMonth) {
+                    // 🔥 مظهر خاص للشهر الجاري
+                    ic='⏳'; cl=''; ti='الشهر الجاري (لم ينتهِ بعد)'; 
                 }
 
                 const highlight = (sClaim !== "" && md.claimNum && md.claimNum.toLowerCase().includes(sClaim)) ? "border: 2px solid blue;" : "";
                 
-                // تفعيل النقر فقط إذا لم يكن قبل العقد (اختياري، هنا تركناه مفعل للتعديل اليدوي لو لزم الأمر)
                 const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
                 const cursor = canEditFunc(userRole, row.type) ? 'pointer' : 'default';
 
-                // ستايل خاص للخلفية الرمادية
-                const bgStyle = isBeforeContract ? 'background:#f9f9f9; color:#ccc;' : '';
+                let bgStyle = '';
+                if (isBeforeContract) bgStyle = 'background:#f9f9f9; color:#ccc;';
+                if (isCurrentMonth && md.financeStatus === 'late') bgStyle = 'background:#fffbf0; color:#f39c12;'; // لون خفيف للانتظار
 
                 tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}; ${highlight}; ${bgStyle}" ${clickAttr}>
                     <div onmousemove="window.showTooltip(event, '${ti.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()">${ic}</div>
@@ -214,7 +222,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     return filtered;
 }
 
-// --- 5. Render Cards (رسم الكروت) ---
+// --- 5. Render Cards ---
 export function renderCards(appData, type) {
     const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
     if (!grid) return;
@@ -273,7 +281,7 @@ export function renderCards(appData, type) {
     }
 }
 
-// --- 6. Update Stats (تحديث الإحصائيات بدقة) ---
+// --- 6. Update Stats (إحصائيات تستثني الشهر الجاري) ---
 export function updateStats(rows, appData, selectedYear) {
     if (!rows || !appData) return;
     const validIndices = [];
@@ -284,9 +292,12 @@ export function updateStats(rows, appData, selectedYear) {
     }
     let totalLate = 0, totalSubmitted = 0;
     
-    // --- منطق التجاهل في الإحصائيات أيضاً ---
     const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
     let effectiveTotalCells = 0;
+
+    // 🔥 تحديد بداية الشهر الحالي للإحصائيات
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     rows.forEach(r => {
         const contractStartDate = new Date(r.startDate);
@@ -299,13 +310,25 @@ export function updateStats(rows, appData, selectedYear) {
                 const mIdx = arMonths.indexOf(mAr);
                 const cellDate = new Date(parseInt(mYear), mIdx, 1);
 
-                // فقط إذا كان الشهر ضمن مدة العقد
-                if (cellDate >= contractStartDate) {
+                // الشروط للإحصائيات:
+                // 1. بعد بداية العقد
+                // 2. الشهر قد انتهى بالفعل (isEnded)
+                const isEnded = cellDate < currentMonthStart;
+
+                if (cellDate >= contractStartDate && isEnded) {
                     effectiveTotalCells++;
                     const m = r.months[idx];
                     if (m) {
                         if (m.financeStatus === 'late') totalLate++;
                         if (m.financeStatus === 'sent') totalSubmitted++;
+                    }
+                } else if (cellDate >= contractStartDate && !isEnded) {
+                    // إذا كان الشهر جاري ولكنه رفعه (برافو عليه)، نحسبه في المرفوع فقط ولا نزيد المقام (أو نزيدهما معاً)
+                    // الأفضل للامتثال: نحسبه كبونص
+                    const m = r.months[idx];
+                    if (m && m.financeStatus === 'sent') {
+                        effectiveTotalCells++;
+                        totalSubmitted++;
                     }
                 }
             });
@@ -325,7 +348,6 @@ export function updateStats(rows, appData, selectedYear) {
     const elActive = document.getElementById('countActive'); if (elActive) elActive.innerText = active;
     const elExpired = document.getElementById('countExpired'); if (elExpired) elExpired.innerText = expired;
     
-    // النسبة المئوية الدقيقة
     const elComp = document.getElementById('complianceRate'); if(elComp) elComp.innerText = effectiveTotalCells > 0 ? Math.round((totalSubmitted/effectiveTotalCells)*100)+'%' : '0%';
     
     const ctx = document.getElementById('kpiChart')?.getContext('2d');
