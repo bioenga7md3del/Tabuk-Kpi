@@ -6,21 +6,23 @@ style.innerHTML = `
   .badge-purple { background-color: #9b59b6; color: white; }
   .badge-dark { background-color: #34495e; color: white; }
   
-  /* Legend Styles */
+  /* تنسيق دليل الألوان (Legend) */
   #kpi-legend {
     display: flex;
     flex-wrap: wrap;
-    gap: 15px;
+    gap: 20px;
     padding: 15px;
     background: #fff;
-    border-top: 1px solid #eee;
-    margin-top: 10px;
-    font-size: 12px;
+    border: 1px solid #eee;
+    margin-top: 15px;
+    margin-bottom: 30px;
+    font-size: 13px;
     justify-content: center;
-    border-radius: 0 0 8px 8px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
   }
-  .legend-item { display: flex; align-items: center; gap: 5px; }
-  .legend-box { width: 15px; height: 15px; border: 1px solid #ddd; border-radius: 3px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-weight: bold; color: #555; }
+  .legend-box { width: 18px; height: 18px; border: 1px solid #ddd; border-radius: 4px; box-shadow: inset 0 0 2px rgba(0,0,0,0.1); }
 `;
 document.head.appendChild(style);
 
@@ -106,29 +108,31 @@ export function renderYearTabs(contracts, selectedYear) {
     container.style.display = 'flex';
 }
 
-// --- 4. Render Legend (رسم دليل الألوان) ---
+// --- 4. Render Legend (إصلاح: الربط بالجدول مباشرة) ---
 function renderLegend() {
-    const tableContainer = document.querySelector('.table-container'); // أو العنصر الأب للجدول
-    if (!tableContainer) return;
+    // 1. البحث عن الجدول
+    const table = document.getElementById('mainTable');
+    if (!table) return;
 
-    // التأكد من عدم تكرار الدليل
+    // 2. منع التكرار
     if (document.getElementById('kpi-legend')) return;
 
+    // 3. إنشاء الدليل
     const legendDiv = document.createElement('div');
     legendDiv.id = 'kpi-legend';
     legendDiv.innerHTML = `
         <div class="legend-item"><div class="legend-box" style="background:#fff"></div><span>الفترة الأساسية</span></div>
-        <div class="legend-item"><div class="legend-box" style="background:#ffe0b2"></div><span>فترة ختامية (آخر 5 شهور)</span></div>
-        <div class="legend-item"><div class="legend-box" style="background:#f3e5f5"></div><span>تمديد 10%</span></div>
-        <div class="legend-item"><div class="legend-box" style="background:#e3f2fd"></div><span>شراء مباشر</span></div>
-        <div class="legend-item"><div class="legend-box" style="background:#f9f9f9"></div><span>خارج نطاق العقد</span></div>
+        <div class="legend-item"><div class="legend-box" style="background:#ffe0b2; border-color:#e67e22"></div><span>فترة ختامية (آخر 5 شهور)</span></div>
+        <div class="legend-item"><div class="legend-box" style="background:#f3e5f5; border-color:#9b59b6"></div><span>تمديد 10%</span></div>
+        <div class="legend-item"><div class="legend-box" style="background:#e3f2fd; border-color:#34495e"></div><span>شراء مباشر</span></div>
+        <div class="legend-item"><div class="legend-box" style="background:#f9f9f9"></div><span>ما قبل العقد</span></div>
     `;
     
-    // إضافته بعد الجدول
-    tableContainer.appendChild(legendDiv);
+    // 4. إضافته بعد الجدول مباشرة (في العنصر الأب)
+    table.parentNode.insertBefore(legendDiv, table.nextSibling);
 }
 
-// --- 5. Render Table (الجدول الملون) ---
+// --- 5. Render Table ---
 export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
@@ -140,7 +144,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
 
     if (!tbody || !hRow) return;
 
-    // استدعاء رسم الدليل مرة واحدة
+    // استدعاء الدليل هنا ليظهر مع الجدول
     renderLegend();
 
     const filteredColumns = []; 
@@ -185,18 +189,17 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         const cName = contractors[row.contractorId]?.name || "غير معروف";
         const cTitle = row.contractName || row.hospital || "بدون اسم";
         
-        // --- 📅 حساب التواريخ الهامة ---
         const contractStartDate = new Date(row.startDate);
         contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
         
         const contractEndDate = new Date(row.endDate);
         contractEndDate.setDate(1); contractEndDate.setHours(0,0,0,0);
 
-        // بداية الفترة الختامية (قبل النهاية بـ 5 شهور)
+        // فترة ختامية (آخر 5 شهور)
         const closingPeriodStart = new Date(contractEndDate);
         closingPeriodStart.setMonth(closingPeriodStart.getMonth() - 5);
 
-        // نهاية التمديد (بعد النهاية بـ 6 شهور)
+        // نهاية التمديد
         const extensionEndDate = new Date(contractEndDate);
         extensionEndDate.setMonth(extensionEndDate.getMonth() + 6);
 
@@ -242,18 +245,16 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 const mIdx = arMonths.indexOf(mAr);
                 const cellDate = new Date(parseInt(mYear), mIdx, 1);
                 
-                // --- 🔥 تحديد نوع الفترة بدقة 🔥 ---
+                // --- تحديد نوع الفترة ---
                 const isBeforeContract = cellDate < contractStartDate;
-                const isDirectPurchase = cellDate > extensionEndDate; // الأولوية 1
-                const isDuringExtension = cellDate > contractEndDate && cellDate <= extensionEndDate; // الأولوية 2
-                // الفترة الختامية هي جزء من الفترة الأصلية (آخر 5 شهور)
-                const isClosingPeriod = cellDate > closingPeriodStart && cellDate <= contractEndDate; // الأولوية 3
+                const isDirectPurchase = cellDate > extensionEndDate;
+                const isDuringExtension = cellDate > contractEndDate && cellDate <= extensionEndDate;
+                const isClosingPeriod = cellDate > closingPeriodStart && cellDate <= contractEndDate;
                 
                 const isCurrentMonth = cellDate.getTime() === currentMonthStart.getTime();
 
                 let ic='✘', cl='status-late', ti='لم يرفع';
                 
-                // نصوص التلميح
                 let periodLabel = "";
                 if (isDirectPurchase) periodLabel = "\n(شراء مباشر)";
                 else if (isDuringExtension) periodLabel = "\n(فترة تمديد 10%)";
@@ -279,23 +280,22 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
                 const cursor = canEditFunc(userRole, row.type) ? 'pointer' : 'default';
 
-                // --- 🔥🔥 التمييز اللوني (حسب الأولوية) 🔥🔥 ---
+                // --- التمييز اللوني ---
                 let bgStyle = '';
                 
                 if (isBeforeContract) {
                     bgStyle = 'background:#f9f9f9; color:#ccc;'; 
                 } 
                 else if (isDirectPurchase) {
-                    bgStyle = 'background:#e3f2fd; border-bottom: 2px solid #34495e;'; // أزرق
+                    bgStyle = 'background:#e3f2fd; border-bottom: 2px solid #34495e;'; 
                 }
                 else if (isDuringExtension) {
-                    bgStyle = 'background:#f3e5f5; border-bottom: 2px solid #9b59b6;'; // بنفسجي
+                    bgStyle = 'background:#f3e5f5; border-bottom: 2px solid #9b59b6;'; 
                 }
                 else if (isClosingPeriod) {
-                    bgStyle = 'background:#ffe0b2; border-bottom: 2px solid #e67e22;'; // برتقالي فاتح
+                    bgStyle = 'background:#ffe0b2; border-bottom: 2px solid #e67e22;'; // تمييز الفترة الختامية
                 }
                 
-                // تمييز الشهر الجاري يطغى على ما قبله
                 if (isCurrentMonth && md.financeStatus === 'late') {
                     bgStyle = 'background:#fffbf0; color:#f39c12; border: 2px dashed #f39c12;';
                 }
@@ -314,9 +314,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     return filtered;
 }
 
-// --- 6. Render Cards & Update Stats (كما هي تماماً) ---
-// ... (بقيت الأكواد هنا لم تتغير ولكن سأضعها ليكون الملف كاملاً) ...
-
+// --- 6. Render Cards & Update Stats ---
 export function renderCards(appData, type) {
     const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
     if (!grid) return;
