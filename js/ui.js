@@ -1,5 +1,17 @@
 // js/ui.js
 
+// --- 0. Inject Styles for New Statuses (إضافة ألوان جديدة برمجياً) ---
+// سنضيف هذه الألوان لكي لا تضطر لتعديل ملف CSS
+const style = document.createElement('style');
+style.innerHTML = `
+  .badge-purple { background-color: #8e44ad; color: white; } /* تمديد */
+  .badge-dark { background-color: #2c3e50; color: white; }   /* شراء مباشر */
+  .bg-extension { background-color: #f3e5f5 !important; }     /* خلفية خلية التمديد */
+  .bg-direct { background-color: #e3f2fd !important; }         /* خلفية خلية الشراء المباشر */
+`;
+document.head.appendChild(style);
+
+
 // --- 1. Tooltip ---
 export function initTooltip() {
     if (!document.getElementById('global-tooltip')) {
@@ -21,17 +33,36 @@ export function showTooltip(e, text) {
 }
 export function hideTooltip() { const t = document.getElementById('global-tooltip'); if (t) t.style.display = 'none'; }
 
-// --- 2. Contract Status ---
+// --- 2. Contract Status (تحديث المنطق: تمديد وشراء مباشر) ---
 function getContractStatus(start, end) {
-    if(!start || !end) return { text: "غير محدد", badge: "badge-grey", is_active: false };
+    if(!start || !end) return { text: "غير محدد", badge: "badge-grey" };
+    
     const today = new Date(); today.setHours(0,0,0,0);
-    const sDate = new Date(start); const eDate = new Date(end);
-    const diffTime = eDate - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    if (today < sDate) return { text: "لم يبدأ", badge: "badge-orange", is_active: false };
-    if (today > eDate) return { text: "منتهي", badge: "badge-red", is_active: false };
-    if (diffDays <= 365) return { text: "على وشك الانتهاء", badge: "badge-yellow", is_active: true };
-    return { text: "ساري", badge: "badge-green", is_active: true };
+    const sDate = new Date(start); 
+    const eDate = new Date(end);
+    
+    // حساب تاريخ نهاية التمديد (6 أشهر بعد النهاية الأصلية)
+    const extensionEndDate = new Date(eDate);
+    extensionEndDate.setMonth(extensionEndDate.getMonth() + 6);
+
+    // 1. لم يبدأ بعد
+    if (today < sDate) return { text: "لم يبدأ", badge: "badge-orange" };
+    
+    // 2. ساري (داخل المدة الأصلية)
+    if (today <= eDate) {
+        const diffTime = eDate - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays <= 365) return { text: "على وشك الانتهاء", badge: "badge-yellow" };
+        return { text: "ساري", badge: "badge-green" };
+    }
+    
+    // 3. فترة التمديد 10% (6 أشهر)
+    if (today <= extensionEndDate) {
+        return { text: "تمديد 10%", badge: "badge-purple" };
+    }
+
+    // 4. شراء مباشر (بعد التمديد)
+    return { text: "شراء مباشر", badge: "badge-dark" };
 }
 
 // --- 3. Render Year Tabs ---
@@ -66,7 +97,7 @@ export function renderYearTabs(contracts, selectedYear) {
     container.style.display = 'flex';
 }
 
-// --- 4. Render Table (تعديل الحساب: تجاهل الشهر الحالي) ---
+// --- 4. Render Table (تلوين الخلايا حسب المرحلة) ---
 export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
@@ -97,7 +128,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
 
     const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
     
-    // 🔥 تحديد بداية الشهر الحالي للمقارنة
+    // تاريخ اليوم لتحديد الشهر الجاري
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -121,36 +152,34 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         const cName = contractors[row.contractorId]?.name || "غير معروف";
         const cTitle = row.contractName || row.hospital || "بدون اسم";
         
-        // --- ✅ حساب التأخير (الشهور المنتهية فقط) ---
+        // تواريخ العقد المهمة
+        const contractStartDate = new Date(row.startDate);
+        contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
+        
+        const contractEndDate = new Date(row.endDate);
+        contractEndDate.setDate(1); contractEndDate.setHours(0,0,0,0); // نهاية الشهر تقريباً للحساب
+
+        const extensionEndDate = new Date(contractEndDate);
+        extensionEndDate.setMonth(extensionEndDate.getMonth() + 6); // نهاية التمديد
+
+        // حساب التأخير (مع تجاهل الشهر الجاري وما قبل العقد)
         let late = 0;
         if (row.months && monthNames) {
-            const contractStartDate = new Date(row.startDate);
-            contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
-
             row.months.forEach((m, idx) => {
                 const mName = monthNames[idx];
                 if (!mName || !m) return;
-
                 const [mAr, mYear] = mName.split(' ');
                 const mIdx = arMonths.indexOf(mAr);
-                
                 if (mIdx > -1) {
                     const cellDate = new Date(parseInt(mYear), mIdx, 1);
-                    
-                    // الشروط:
-                    // 1. الشهر داخل مدة العقد (cellDate >= contractStartDate)
-                    // 2. الشهر انتهى بالفعل (cellDate < currentMonthStart)
-                    // 3. الحالة هي متأخر
-                    
                     const isEnded = cellDate < currentMonthStart;
-                    
+                    // نحسب التأخير في كل المراحل (أصلي، تمديد، شراء مباشر) طالما الشهر انتهى
                     if (cellDate >= contractStartDate && isEnded && m.financeStatus === 'late') {
                         late++;
                     }
                 }
             });
         }
-        // ------------------------------------------------
 
         const badge = late > 0 ? 'badge-red' : 'badge-green';
         let valFmt = row.value ? Number(row.value).toLocaleString() : '-';
@@ -177,36 +206,48 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 const mIdx = arMonths.indexOf(mAr);
                 const cellDate = new Date(parseInt(mYear), mIdx, 1);
                 
-                const contractStartDate = new Date(row.startDate);
-                contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
-                
+                // تحديد موقع الشهر زمنياً
                 const isBeforeContract = cellDate < contractStartDate;
+                const isDuringOriginal = cellDate >= contractStartDate && cellDate <= contractEndDate;
+                const isDuringExtension = cellDate > contractEndDate && cellDate <= extensionEndDate;
+                const isDirectPurchase = cellDate > extensionEndDate;
+                
                 const isCurrentMonth = cellDate.getTime() === currentMonthStart.getTime();
 
                 let ic='✘', cl='status-late', ti='لم يرفع';
                 
+                // تحديد النصوص بناءً على المرحلة
+                let periodText = "";
+                if (isDuringExtension) periodText = "\n(فترة تمديد 10%)";
+                if (isDirectPurchase) periodText = "\n(شراء مباشر)";
+
                 if(md.financeStatus === 'sent') { 
-                    ic='✅'; cl='status-ok'; ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}`; 
+                    ic='✅'; cl='status-ok'; ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}${periodText}`; 
                 }
                 else if(md.financeStatus === 'returned') { 
-                    ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}`; 
+                    ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}${periodText}`; 
                 }
                 else if (isBeforeContract) { 
                     ic='-'; cl=''; ti='قبل بداية العقد';
                 }
                 else if (isCurrentMonth) {
-                    // 🔥 مظهر خاص للشهر الجاري
                     ic='⏳'; cl=''; ti='الشهر الجاري (لم ينتهِ بعد)'; 
+                }
+                else {
+                    // الحالة متأخر - نضيف النص للتوضيح
+                    ti += periodText;
                 }
 
                 const highlight = (sClaim !== "" && md.claimNum && md.claimNum.toLowerCase().includes(sClaim)) ? "border: 2px solid blue;" : "";
-                
                 const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
                 const cursor = canEditFunc(userRole, row.type) ? 'pointer' : 'default';
 
+                // --- تلوين الخلفيات حسب المرحلة ---
                 let bgStyle = '';
                 if (isBeforeContract) bgStyle = 'background:#f9f9f9; color:#ccc;';
-                if (isCurrentMonth && md.financeStatus === 'late') bgStyle = 'background:#fffbf0; color:#f39c12;'; // لون خفيف للانتظار
+                else if (isCurrentMonth && md.financeStatus === 'late') bgStyle = 'background:#fffbf0; color:#f39c12;';
+                else if (isDuringExtension) bgStyle = 'background:#f3e5f5;'; // لون بنفسجي فاتح للتمديد
+                else if (isDirectPurchase) bgStyle = 'background:#e3f2fd;'; // لون أزرق فاتح للشراء المباشر
 
                 tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}; ${highlight}; ${bgStyle}" ${clickAttr}>
                     <div onmousemove="window.showTooltip(event, '${ti.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()">${ic}</div>
@@ -227,7 +268,7 @@ export function renderCards(appData, type) {
     const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
     if (!grid) return;
     grid.innerHTML = '';
-
+    // (الجزء الخاص بالكروت كما هو - يتم تحديث الحالة تلقائياً عبر getContractStatus)
     if (type === 'contract') {
         const fName = document.getElementById('filterContractName')?.value.toLowerCase() || "";
         const fStatus = document.getElementById('filterContractStatus')?.value || "all";
@@ -281,7 +322,7 @@ export function renderCards(appData, type) {
     }
 }
 
-// --- 6. Update Stats (إحصائيات تستثني الشهر الجاري) ---
+// --- 6. Update Stats ---
 export function updateStats(rows, appData, selectedYear) {
     if (!rows || !appData) return;
     const validIndices = [];
@@ -294,8 +335,6 @@ export function updateStats(rows, appData, selectedYear) {
     
     const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
     let effectiveTotalCells = 0;
-
-    // 🔥 تحديد بداية الشهر الحالي للإحصائيات
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -309,10 +348,7 @@ export function updateStats(rows, appData, selectedYear) {
                 const [mAr, mYear] = mName.split(' ');
                 const mIdx = arMonths.indexOf(mAr);
                 const cellDate = new Date(parseInt(mYear), mIdx, 1);
-
-                // الشروط للإحصائيات:
-                // 1. بعد بداية العقد
-                // 2. الشهر قد انتهى بالفعل (isEnded)
+                
                 const isEnded = cellDate < currentMonthStart;
 
                 if (cellDate >= contractStartDate && isEnded) {
@@ -323,8 +359,6 @@ export function updateStats(rows, appData, selectedYear) {
                         if (m.financeStatus === 'sent') totalSubmitted++;
                     }
                 } else if (cellDate >= contractStartDate && !isEnded) {
-                    // إذا كان الشهر جاري ولكنه رفعه (برافو عليه)، نحسبه في المرفوع فقط ولا نزيد المقام (أو نزيدهما معاً)
-                    // الأفضل للامتثال: نحسبه كبونص
                     const m = r.months[idx];
                     if (m && m.financeStatus === 'sent') {
                         effectiveTotalCells++;
@@ -338,8 +372,8 @@ export function updateStats(rows, appData, selectedYear) {
     let active = 0, expired = 0;
     rows.forEach(r => {
         const st = getContractStatus(r.startDate, r.endDate);
-        if(st.text === 'ساري' || st.text === 'على وشك الانتهاء') active++;
-        if(st.text === 'منتهي') expired++;
+        if(st.text === 'ساري' || st.text === 'على وشك الانتهاء' || st.text === 'تمديد 10%') active++;
+        if(st.text === 'منتهي' || st.text === 'شراء مباشر') expired++;
     });
 
     const elHosp = document.getElementById('countHospitals'); if (elHosp) elHosp.innerText = new Set(rows.map(r=>r.hospital)).size;
