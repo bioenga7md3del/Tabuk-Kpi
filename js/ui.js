@@ -1,13 +1,10 @@
 // js/ui.js
 
-// --- 0. Inject Styles for New Statuses (إضافة ألوان جديدة برمجياً) ---
-// سنضيف هذه الألوان لكي لا تضطر لتعديل ملف CSS
+// --- 0. إضافة ألوان جديدة (CSS Injection) ---
 const style = document.createElement('style');
 style.innerHTML = `
-  .badge-purple { background-color: #8e44ad; color: white; } /* تمديد */
-  .badge-dark { background-color: #2c3e50; color: white; }   /* شراء مباشر */
-  .bg-extension { background-color: #f3e5f5 !important; }     /* خلفية خلية التمديد */
-  .bg-direct { background-color: #e3f2fd !important; }         /* خلفية خلية الشراء المباشر */
+  .badge-purple { background-color: #9b59b6; color: white; } /* شارة تمديد */
+  .badge-dark { background-color: #34495e; color: white; }   /* شارة شراء مباشر */
 `;
 document.head.appendChild(style);
 
@@ -33,7 +30,7 @@ export function showTooltip(e, text) {
 }
 export function hideTooltip() { const t = document.getElementById('global-tooltip'); if (t) t.style.display = 'none'; }
 
-// --- 2. Contract Status (تحديث المنطق: تمديد وشراء مباشر) ---
+// --- 2. Contract Status (المنطق الزمني: ساري / تمديد / شراء مباشر) ---
 function getContractStatus(start, end) {
     if(!start || !end) return { text: "غير محدد", badge: "badge-grey" };
     
@@ -41,14 +38,14 @@ function getContractStatus(start, end) {
     const sDate = new Date(start); 
     const eDate = new Date(end);
     
-    // حساب تاريخ نهاية التمديد (6 أشهر بعد النهاية الأصلية)
+    // تاريخ نهاية التمديد (6 أشهر)
     const extensionEndDate = new Date(eDate);
     extensionEndDate.setMonth(extensionEndDate.getMonth() + 6);
 
-    // 1. لم يبدأ بعد
+    // 1. لم يبدأ
     if (today < sDate) return { text: "لم يبدأ", badge: "badge-orange" };
     
-    // 2. ساري (داخل المدة الأصلية)
+    // 2. ساري (الفترة الأصلية)
     if (today <= eDate) {
         const diffTime = eDate - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -56,7 +53,7 @@ function getContractStatus(start, end) {
         return { text: "ساري", badge: "badge-green" };
     }
     
-    // 3. فترة التمديد 10% (6 أشهر)
+    // 3. فترة التمديد (بعد النهاية وحتى 6 أشهر)
     if (today <= extensionEndDate) {
         return { text: "تمديد 10%", badge: "badge-purple" };
     }
@@ -97,7 +94,7 @@ export function renderYearTabs(contracts, selectedYear) {
     container.style.display = 'flex';
 }
 
-// --- 4. Render Table (تلوين الخلايا حسب المرحلة) ---
+// --- 4. Render Table (الجدول مع التمييز اللوني) ---
 export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
@@ -128,7 +125,6 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
 
     const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
     
-    // تاريخ اليوم لتحديد الشهر الجاري
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -152,17 +148,16 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         const cName = contractors[row.contractorId]?.name || "غير معروف";
         const cTitle = row.contractName || row.hospital || "بدون اسم";
         
-        // تواريخ العقد المهمة
+        // حساب التواريخ الفاصلة
         const contractStartDate = new Date(row.startDate);
         contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
         
         const contractEndDate = new Date(row.endDate);
-        contractEndDate.setDate(1); contractEndDate.setHours(0,0,0,0); // نهاية الشهر تقريباً للحساب
+        contractEndDate.setDate(1); contractEndDate.setHours(0,0,0,0);
 
         const extensionEndDate = new Date(contractEndDate);
         extensionEndDate.setMonth(extensionEndDate.getMonth() + 6); // نهاية التمديد
 
-        // حساب التأخير (مع تجاهل الشهر الجاري وما قبل العقد)
         let late = 0;
         if (row.months && monthNames) {
             row.months.forEach((m, idx) => {
@@ -173,7 +168,6 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 if (mIdx > -1) {
                     const cellDate = new Date(parseInt(mYear), mIdx, 1);
                     const isEnded = cellDate < currentMonthStart;
-                    // نحسب التأخير في كل المراحل (أصلي، تمديد، شراء مباشر) طالما الشهر انتهى
                     if (cellDate >= contractStartDate && isEnded && m.financeStatus === 'late') {
                         late++;
                     }
@@ -206,26 +200,29 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 const mIdx = arMonths.indexOf(mAr);
                 const cellDate = new Date(parseInt(mYear), mIdx, 1);
                 
-                // تحديد موقع الشهر زمنياً
+                // --- 🔥 تحديد نوع الفترة 🔥 ---
                 const isBeforeContract = cellDate < contractStartDate;
+                // الفترة الأصلية: من البداية حتى النهاية
                 const isDuringOriginal = cellDate >= contractStartDate && cellDate <= contractEndDate;
+                // فترة التمديد: بعد النهاية وحتى 6 أشهر
                 const isDuringExtension = cellDate > contractEndDate && cellDate <= extensionEndDate;
+                // الشراء المباشر: ما بعد التمديد
                 const isDirectPurchase = cellDate > extensionEndDate;
                 
                 const isCurrentMonth = cellDate.getTime() === currentMonthStart.getTime();
 
                 let ic='✘', cl='status-late', ti='لم يرفع';
                 
-                // تحديد النصوص بناءً على المرحلة
-                let periodText = "";
-                if (isDuringExtension) periodText = "\n(فترة تمديد 10%)";
-                if (isDirectPurchase) periodText = "\n(شراء مباشر)";
+                // نصوص إضافية للتلميح
+                let periodLabel = "";
+                if (isDuringExtension) periodLabel = "\n(فترة تمديد 10%)";
+                if (isDirectPurchase) periodLabel = "\n(شراء مباشر)";
 
                 if(md.financeStatus === 'sent') { 
-                    ic='✅'; cl='status-ok'; ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}${periodText}`; 
+                    ic='✅'; cl='status-ok'; ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}${periodLabel}`; 
                 }
                 else if(md.financeStatus === 'returned') { 
-                    ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}${periodText}`; 
+                    ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}${periodLabel}`; 
                 }
                 else if (isBeforeContract) { 
                     ic='-'; cl=''; ti='قبل بداية العقد';
@@ -234,20 +231,32 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                     ic='⏳'; cl=''; ti='الشهر الجاري (لم ينتهِ بعد)'; 
                 }
                 else {
-                    // الحالة متأخر - نضيف النص للتوضيح
-                    ti += periodText;
+                    ti += periodLabel; // إضافة التصنيف لحالة التأخير أيضاً
                 }
 
                 const highlight = (sClaim !== "" && md.claimNum && md.claimNum.toLowerCase().includes(sClaim)) ? "border: 2px solid blue;" : "";
                 const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
                 const cursor = canEditFunc(userRole, row.type) ? 'pointer' : 'default';
 
-                // --- تلوين الخلفيات حسب المرحلة ---
+                // --- 🔥🔥 التمييز اللوني (الخلفيات) 🔥🔥 ---
                 let bgStyle = '';
-                if (isBeforeContract) bgStyle = 'background:#f9f9f9; color:#ccc;';
-                else if (isCurrentMonth && md.financeStatus === 'late') bgStyle = 'background:#fffbf0; color:#f39c12;';
-                else if (isDuringExtension) bgStyle = 'background:#f3e5f5;'; // لون بنفسجي فاتح للتمديد
-                else if (isDirectPurchase) bgStyle = 'background:#e3f2fd;'; // لون أزرق فاتح للشراء المباشر
+                
+                if (isBeforeContract) {
+                    bgStyle = 'background:#f9f9f9; color:#ccc;'; // رمادي باهت
+                } 
+                else if (isDuringExtension) {
+                    // لون بنفسجي فاتح جداً للتمديد
+                    bgStyle = 'background:#f3e5f5; border-bottom: 2px solid #9b59b6;'; 
+                } 
+                else if (isDirectPurchase) {
+                    // لون أزرق سماوي للشراء المباشر
+                    bgStyle = 'background:#e3f2fd; border-bottom: 2px solid #34495e;'; 
+                }
+                
+                // تمييز خاص للشهر الجاري (فوق أي لون آخر)
+                if (isCurrentMonth && md.financeStatus === 'late') {
+                    bgStyle = 'background:#fffbf0; color:#f39c12; border: 2px dashed #f39c12;';
+                }
 
                 tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}; ${highlight}; ${bgStyle}" ${clickAttr}>
                     <div onmousemove="window.showTooltip(event, '${ti.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()">${ic}</div>
@@ -263,12 +272,14 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     return filtered;
 }
 
-// --- 5. Render Cards ---
+// --- 5. Render Cards (كما هي) ---
 export function renderCards(appData, type) {
     const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
     if (!grid) return;
     grid.innerHTML = '';
-    // (الجزء الخاص بالكروت كما هو - يتم تحديث الحالة تلقائياً عبر getContractStatus)
+    // ... نفس الكود السابق ...
+    // اختصاراً للمساحة، ضع الكود الخاص بالكروت هنا (لم يتغير)
+    // سأضع لك الكود الأساسي لضمان عمله
     if (type === 'contract') {
         const fName = document.getElementById('filterContractName')?.value.toLowerCase() || "";
         const fStatus = document.getElementById('filterContractStatus')?.value || "all";
