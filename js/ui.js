@@ -6,7 +6,7 @@ style.innerHTML = `
   .badge-purple { background-color: #9b59b6; color: white; }
   .badge-dark { background-color: #34495e; color: white; }
   
-  /* تنسيق دليل الألوان (Legend) */
+  /* تنسيق دليل الألوان */
   #kpi-legend {
     display: flex;
     flex-wrap: wrap;
@@ -108,16 +108,12 @@ export function renderYearTabs(contracts, selectedYear) {
     container.style.display = 'flex';
 }
 
-// --- 4. Render Legend (إصلاح: الربط بالجدول مباشرة) ---
+// --- 4. Render Legend ---
 function renderLegend() {
-    // 1. البحث عن الجدول
     const table = document.getElementById('mainTable');
     if (!table) return;
-
-    // 2. منع التكرار
     if (document.getElementById('kpi-legend')) return;
 
-    // 3. إنشاء الدليل
     const legendDiv = document.createElement('div');
     legendDiv.id = 'kpi-legend';
     legendDiv.innerHTML = `
@@ -125,10 +121,9 @@ function renderLegend() {
         <div class="legend-item"><div class="legend-box" style="background:#ffe0b2; border-color:#e67e22"></div><span>فترة ختامية (آخر 5 شهور)</span></div>
         <div class="legend-item"><div class="legend-box" style="background:#f3e5f5; border-color:#9b59b6"></div><span>تمديد 10%</span></div>
         <div class="legend-item"><div class="legend-box" style="background:#e3f2fd; border-color:#34495e"></div><span>شراء مباشر</span></div>
-        <div class="legend-item"><div class="legend-box" style="background:#f9f9f9"></div><span>ما قبل العقد</span></div>
+        <div class="legend-item"><div class="legend-box" style="background:#f9f9f9"></div><span>ما قبل العقد (مغلق)</span></div>
     `;
     
-    // 4. إضافته بعد الجدول مباشرة (في العنصر الأب)
     table.parentNode.insertBefore(legendDiv, table.nextSibling);
 }
 
@@ -144,7 +139,6 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
 
     if (!tbody || !hRow) return;
 
-    // استدعاء الدليل هنا ليظهر مع الجدول
     renderLegend();
 
     const filteredColumns = []; 
@@ -195,11 +189,9 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         const contractEndDate = new Date(row.endDate);
         contractEndDate.setDate(1); contractEndDate.setHours(0,0,0,0);
 
-        // فترة ختامية (آخر 5 شهور)
         const closingPeriodStart = new Date(contractEndDate);
         closingPeriodStart.setMonth(closingPeriodStart.getMonth() - 5);
 
-        // نهاية التمديد
         const extensionEndDate = new Date(contractEndDate);
         extensionEndDate.setMonth(extensionEndDate.getMonth() + 6);
 
@@ -245,7 +237,6 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 const mIdx = arMonths.indexOf(mAr);
                 const cellDate = new Date(parseInt(mYear), mIdx, 1);
                 
-                // --- تحديد نوع الفترة ---
                 const isBeforeContract = cellDate < contractStartDate;
                 const isDirectPurchase = cellDate > extensionEndDate;
                 const isDuringExtension = cellDate > contractEndDate && cellDate <= extensionEndDate;
@@ -267,7 +258,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                     ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}${periodLabel}`; 
                 }
                 else if (isBeforeContract) { 
-                    ic='-'; cl=''; ti='قبل بداية العقد';
+                    ic='-'; cl=''; ti='قبل بداية العقد (مغلق)';
                 }
                 else if (isCurrentMonth) {
                     ic='⏳'; cl=''; ti='الشهر الجاري (لم ينتهِ بعد)'; 
@@ -277,10 +268,13 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 }
 
                 const highlight = (sClaim !== "" && md.claimNum && md.claimNum.toLowerCase().includes(sClaim)) ? "border: 2px solid blue;" : "";
-                const clickAttr = canEditFunc(userRole, row.type) ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
-                const cursor = canEditFunc(userRole, row.type) ? 'pointer' : 'default';
+                
+                // --- 🔥 الشرط الجديد: منع النقر إذا كان قبل العقد 🔥 ---
+                const canClick = canEditFunc(userRole, row.type) && !isBeforeContract;
+                
+                const clickAttr = canClick ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
+                const cursor = canClick ? 'pointer' : 'default'; // تغيير شكل الماوس أيضاً
 
-                // --- التمييز اللوني ---
                 let bgStyle = '';
                 
                 if (isBeforeContract) {
@@ -293,7 +287,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                     bgStyle = 'background:#f3e5f5; border-bottom: 2px solid #9b59b6;'; 
                 }
                 else if (isClosingPeriod) {
-                    bgStyle = 'background:#ffe0b2; border-bottom: 2px solid #e67e22;'; // تمييز الفترة الختامية
+                    bgStyle = 'background:#ffe0b2; border-bottom: 2px solid #e67e22;'; 
                 }
                 
                 if (isCurrentMonth && md.financeStatus === 'late') {
@@ -314,7 +308,8 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     return filtered;
 }
 
-// --- 6. Render Cards & Update Stats ---
+// --- 6. Render Cards & Update Stats (يستمر الكود كما هو بالأسفل) ---
+
 export function renderCards(appData, type) {
     const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
     if (!grid) return;
