@@ -15,7 +15,7 @@
 
     <div id="loginScreen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f3f4f6;">
         <div class="data-card" style="width: 350px; text-align: center; padding: 40px;">
-            <img src="TabukCluster.jpeg" style="height: 80px; margin-bottom: 20px; border-radius: 10px;">
+            <img src="TabukCluster.jpeg" style="height: 80px; margin-bottom: 20px; border-radius: 10px;" alt="شعار التجمع">
             <h2 style="color: var(--primary); margin-bottom: 20px;">تسجيل الدخول</h2>
             <input type="password" id="adminPassword" class="form-control" placeholder="كلمة المرور" style="margin-bottom: 15px; width: 100%; text-align: center;">
             <button class="btn-primary" style="width: 100%; justify-content: center; padding: 12px;" onclick="window.adminLogin()">دخول للنظام</button>
@@ -26,7 +26,7 @@
         
         <nav class="navbar">
             <div class="nav-brand">
-                <img src="TabukCluster.jpeg" style="height: 45px; border-radius: 5px;">
+                <img src="TabukCluster.jpeg" style="height: 45px; border-radius: 5px; margin-left: 10px;">
                 <span>نظام متابعة العقود والمستخلصات</span>
             </div>
             <div class="nav-links">
@@ -58,7 +58,8 @@
 
                     <button class="btn-secondary" onclick="window.printReport()">🖨️ طباعة</button>
                     
-                    <button class="btn-success super-admin-only" onclick="window.downloadBackup()">📥 نسخ احتياطي</button>
+                    <button class="btn-primary super-admin-only" onclick="window.downloadBackup()">📥 نسخ احتياطي</button>
+                    <button class="btn-dark super-admin-only" onclick="window.openSettings()" style="background-color: #34495e; color: white;">⚙️ الإعدادات</button>
                     <button class="btn-purple super-admin-only" onclick="window.prepareMonthsUpdate()">📅 تحديث الشهور</button>
                     <button class="btn-danger super-admin-only" onclick="window.systemReset()">⚠️ ضبط النظام</button>
                 </div>
@@ -97,7 +98,7 @@
                         <tbody id="tableBody"></tbody>
                     </table>
                 </div>
-            </div>
+                </div>
 
             <div id="tab-contracts" class="tab-content">
                 <div class="toolbar-section">
