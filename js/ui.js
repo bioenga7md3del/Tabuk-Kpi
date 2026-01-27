@@ -1,6 +1,6 @@
 // js/ui.js
 
-// --- 0. Styles Injection ---
+// --- 0. Styles ---
 const style = document.createElement('style');
 style.innerHTML = `
     .badge-purple { background-color: #9b59b6; color: white; }
@@ -16,7 +16,6 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-// --- 1. Helpers ---
 export function initTooltip() { if (!document.getElementById('global-tooltip')) document.body.appendChild(document.createElement('div')).id = 'global-tooltip'; }
 export function showTooltip(e, text) { const t = document.getElementById('global-tooltip'); if (t && text) { t.innerText = text; t.style.display = 'block'; t.style.top = (e.clientY + 15) + 'px'; t.style.left = (e.clientX + 15) + 'px'; } }
 export function hideTooltip() { const t = document.getElementById('global-tooltip'); if (t) t.style.display = 'none'; }
@@ -53,7 +52,7 @@ function renderLegend() {
     table.parentNode.insertBefore(div, table.nextSibling);
 }
 
-// --- Render Table (with Highlight) ---
+// --- Render Table (with Role Filtering) ---
 export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
@@ -75,7 +74,13 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     hRow.innerHTML = hHTML;
 
     tbody.innerHTML = '';
-    const rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
+    let rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
+
+    // --- 🚨 فلترة إجبارية حسب الصلاحية ---
+    if (userRole === 'medical') rows = rows.filter(r => r.type === 'طبي');
+    if (userRole === 'non_medical') rows = rows.filter(r => r.type === 'غير طبي');
+    // المطلع والسوبر يرون الكل
+
     if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="15" style="padding:20px;color:#777">لا توجد بيانات</td></tr>`; return []; }
 
     const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
@@ -151,33 +156,79 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 else if (isDuringExtension) bgStyle = 'background:#f3e5f5; border-bottom: 2px solid #9b59b6;';
                 else if (isClosingPeriod) bgStyle = 'background:#ffe0b2; border-bottom: 2px solid #e67e22;';
 
-                const canClick = canEditFunc(userRole, row.type) && !isBeforeContract;
+                // تعطيل النقر للمطلع
+                const canClick = (userRole !== 'viewer') && canEditFunc(userRole, row.type) && !isBeforeContract;
                 const clickAttr = canClick ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
                 
                 tr.innerHTML += `<td class="${cl}" style="cursor:${canClick?'pointer':'default'}; ${bgStyle}; ${highlightStyle}" ${clickAttr} title="${ti}">${ic}</td>`;
             });
         } else { tr.innerHTML += `<td>-</td>`; }
-        tr.innerHTML += `<td onclick="window.editNote('${row.id}')" style="cursor:pointer; font-size:11px;">${row.notes||''}</td>`;
+        
+        const canEditNote = (userRole !== 'viewer') && canEditFunc(userRole, row.type);
+        tr.innerHTML += `<td onclick="${canEditNote ? `window.editNote('${row.id}')` : ''}" style="cursor:${canEditNote?'pointer':'default'}; font-size:11px;">${row.notes||''}</td>`;
         tbody.appendChild(tr);
     });
     return filtered;
 }
 
-// --- Notifications & Stats & Print ---
-export function checkNotifications(contracts) {
-    const list = document.getElementById('notifList'); const badge = document.getElementById('notifBadge');
-    if (!list || !badge) return;
-    list.innerHTML = ''; let count = 0; const today = new Date(); today.setHours(0,0,0,0);
-    Object.values(contracts).forEach(c => {
-        if (!c.endDate) return;
-        const eDate = new Date(c.endDate); const diffDays = Math.ceil((eDate - today) / (1000 * 60 * 60 * 24));
-        if (diffDays > 0 && diffDays <= 90) { count++; list.innerHTML += `<div class="notif-item notif-urgent"><strong>⏳ قرب انتهاء:</strong> ${c.contractName || c.hospital}<br><span style="color:gray">باقي ${diffDays} يوم.</span></div>`; }
-        const extEndDate = new Date(eDate); extEndDate.setMonth(extEndDate.getMonth() + 6);
-        if (today > eDate && today <= extEndDate) { count++; list.innerHTML += `<div class="notif-item notif-warning"><strong>📈 تمديد:</strong> ${c.contractName || c.hospital}<br><span style="color:gray">فترة 10%</span></div>`; }
-    });
-    if (count > 0) { badge.innerText = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; list.innerHTML = `<div style="padding:15px; text-align:center; color:#777">لا توجد تنبيهات</div>`; }
+// --- Render Cards (with Role Filtering) ---
+export function renderCards(appData, type) {
+    const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid'); if (!grid) return;
+    grid.innerHTML = '';
+    
+    // إخفاء كروت التعديل للمطلع (باستخدام CSS class)
+    const isViewer = (window.userRole === 'viewer');
+    const actionDisplay = isViewer ? 'none' : 'flex';
+
+    if (type === 'contract') {
+        const fName = document.getElementById('filterContractName')?.value.toLowerCase() || "";
+        const fStatus = document.getElementById('filterContractStatus')?.value || "all";
+        let allContracts = Object.entries(appData.contracts);
+
+        // --- 🚨 فلترة إجبارية للكروت ---
+        if (window.userRole === 'medical') allContracts = allContracts.filter(([, r]) => r.type === 'طبي');
+        if (window.userRole === 'non_medical') allContracts = allContracts.filter(([, r]) => r.type === 'غير طبي');
+
+        const filtered = allContracts.filter(([, row]) => {
+            const name = row.contractName || row.hospital || "";
+            const st = getContractStatus(row.startDate, row.endDate);
+            const matchName = name.toLowerCase().includes(fName);
+            let matchStatus = false;
+            if (fStatus === 'all') matchStatus = true;
+            else if (fStatus === 'active' && st.text === 'ساري') matchStatus = true;
+            else if (fStatus === 'soon' && st.text === 'على وشك الانتهاء') matchStatus = true;
+            else if (fStatus === 'expired' && st.text === 'منتهي') matchStatus = true;
+            return matchName && matchStatus;
+        });
+
+        filtered.sort(([,a], [,b]) => (a.contractName||a.hospital||"").localeCompare(b.contractName||b.hospital||"", 'ar'));
+        filtered.forEach(([id, row]) => {
+            const cName = appData.contractors[row.contractorId]?.name || "-";
+            const st = getContractStatus(row.startDate, row.endDate);
+            const div = document.createElement('div'); div.className = 'data-card';
+            div.innerHTML = `<div class="card-header"><div><div class="card-title">${row.contractName||row.hospital}</div><span class="badge ${st.badge}" style="font-size:10px">${st.text}</span></div><span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span></div><div class="card-body"><div class="row"><span>المقاول:</span><b>${cName}</b></div><div class="row"><span>النهاية:</span><b>${row.endDate||'-'}</b></div></div>
+            <div class="card-actions" style="display:${actionDisplay}"><button class="btn-primary" onclick="window.prepareEditContract('${id}')">تعديل</button><button class="btn-danger" onclick="window.deleteContract('${id}')">حذف</button></div>`;
+            grid.appendChild(div);
+        });
+    } else {
+        Object.entries(appData.contractors).forEach(([id, row]) => {
+            const div = document.createElement('div'); div.className = 'data-card';
+            div.innerHTML = `<div class="card-header" style="border:none"><div class="card-title">${row.name}</div></div>
+            <div class="card-actions" style="display:${actionDisplay}"><button class="btn-primary" onclick="window.prepareEditContractor('${id}','${row.name}')">تعديل</button><button class="btn-danger" onclick="window.deleteContractor('${id}')">حذف</button></div>`;
+            grid.appendChild(div);
+        });
+    }
 }
 
+export function showToast(msg) { const t = document.getElementById("toast"); if(t) { t.innerText = msg; t.className = "show"; setTimeout(() => t.className = "", 2500); } }
+export function exportToExcel() { const ws = XLSX.utils.table_to_sheet(document.getElementById('mainTable')); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "KPI"); XLSX.writeFile(wb, "KPI_Report.xlsx"); }
+export function toggleNotifications() { const menu = document.getElementById('notifDropdown'); menu.style.display = (menu.style.display === 'none') ? 'block' : 'none'; }
+export function printReport() { const d = new Date(); document.getElementById('printDate').innerText = d.toLocaleDateString('ar-SA'); window.print(); }
+export function updateStats(rows, appData, selectedYear) { /* Same as before, keeping it short */ 
+    /* ملاحظة: الدالة هنا يجب أن تكون نسختها الكاملة كما في الردود السابقة، تم اختصارها هنا للمساحة فقط، تأكد من وجودها */
+    const { updateStats: realUpdateStats } = require('./ui_stats.js'); // هذا مجرد مثال، استخدم الكود الأصلي للدالة
+}
+// إعادة دالة updateStats الكاملة لضمان عملها (لأنها مهمة للإحصائيات):
 export function updateStats(rows, appData, selectedYear) {
     if (!rows || !appData) return;
     let totalLate = 0, totalSubmitted = 0, effectiveTotalCells = 0;
@@ -216,43 +267,20 @@ export function updateStats(rows, appData, selectedYear) {
     const ctx = document.getElementById('kpiChart')?.getContext('2d');
     if (ctx) { if(window.myChart) window.myChart.destroy(); window.myChart = new Chart(ctx, { type: 'doughnut', data: { labels:['مرفوع','متأخر'], datasets:[{data:[totalSubmitted, effectiveTotalCells-totalSubmitted], backgroundColor:['#27ae60','#c0392b']}] }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } }); }
 }
+export function checkNotifications(contracts) { /* Code Same as Before */ 
+    const list = document.getElementById('notifList'); const badge = document.getElementById('notifBadge');
+    if (!list || !badge) return;
+    list.innerHTML = ''; let count = 0; const today = new Date(); today.setHours(0,0,0,0);
+    Object.values(contracts).forEach(c => {
+        // فلترة التنبيهات أيضاً حسب الصلاحية
+        if (window.userRole === 'medical' && c.type !== 'طبي') return;
+        if (window.userRole === 'non_medical' && c.type !== 'غير طبي') return;
 
-export function renderCards(appData, type) {
-    const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid'); if (!grid) return;
-    grid.innerHTML = '';
-    if (type === 'contract') {
-        const fName = document.getElementById('filterContractName')?.value.toLowerCase() || "";
-        const fStatus = document.getElementById('filterContractStatus')?.value || "all";
-        const allContracts = Object.entries(appData.contracts);
-        const filtered = allContracts.filter(([, row]) => {
-            const name = row.contractName || row.hospital || "";
-            const st = getContractStatus(row.startDate, row.endDate);
-            const matchName = name.toLowerCase().includes(fName);
-            let matchStatus = false;
-            if (fStatus === 'all') matchStatus = true;
-            else if (fStatus === 'active' && st.text === 'ساري') matchStatus = true;
-            else if (fStatus === 'soon' && st.text === 'على وشك الانتهاء') matchStatus = true;
-            else if (fStatus === 'expired' && st.text === 'منتهي') matchStatus = true;
-            return matchName && matchStatus;
-        });
-        filtered.sort(([,a], [,b]) => (a.contractName||a.hospital||"").localeCompare(b.contractName||b.hospital||"", 'ar'));
-        filtered.forEach(([id, row]) => {
-            const cName = appData.contractors[row.contractorId]?.name || "-";
-            const st = getContractStatus(row.startDate, row.endDate);
-            const div = document.createElement('div'); div.className = 'data-card';
-            div.innerHTML = `<div class="card-header"><div><div class="card-title">${row.contractName||row.hospital}</div><span class="badge ${st.badge}" style="font-size:10px">${st.text}</span></div><span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span></div><div class="card-body"><div class="row"><span>المقاول:</span><b>${cName}</b></div><div class="row"><span>النهاية:</span><b>${row.endDate||'-'}</b></div></div><div class="card-actions"><button class="btn-primary" onclick="window.prepareEditContract('${id}')">تعديل</button><button class="btn-danger" onclick="window.deleteContract('${id}')">حذف</button></div>`;
-            grid.appendChild(div);
-        });
-    } else {
-        Object.entries(appData.contractors).forEach(([id, row]) => {
-            const div = document.createElement('div'); div.className = 'data-card';
-            div.innerHTML = `<div class="card-header" style="border:none"><div class="card-title">${row.name}</div></div><div class="card-actions"><button class="btn-primary" onclick="window.prepareEditContractor('${id}','${row.name}')">تعديل</button><button class="btn-danger" onclick="window.deleteContractor('${id}')">حذف</button></div>`;
-            grid.appendChild(div);
-        });
-    }
+        if (!c.endDate) return;
+        const eDate = new Date(c.endDate); const diffDays = Math.ceil((eDate - today) / (1000 * 60 * 60 * 24));
+        if (diffDays > 0 && diffDays <= 90) { count++; list.innerHTML += `<div class="notif-item notif-urgent"><strong>⏳ قرب انتهاء:</strong> ${c.contractName || c.hospital}<br><span style="color:gray">باقي ${diffDays} يوم.</span></div>`; }
+        const extEndDate = new Date(eDate); extEndDate.setMonth(extEndDate.getMonth() + 6);
+        if (today > eDate && today <= extEndDate) { count++; list.innerHTML += `<div class="notif-item notif-warning"><strong>📈 تمديد:</strong> ${c.contractName || c.hospital}<br><span style="color:gray">فترة 10%</span></div>`; }
+    });
+    if (count > 0) { badge.innerText = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; list.innerHTML = `<div style="padding:15px; text-align:center; color:#777">لا توجد تنبيهات</div>`; }
 }
-
-export function showToast(msg) { const t = document.getElementById("toast"); if(t) { t.innerText = msg; t.className = "show"; setTimeout(() => t.className = "", 2500); } }
-export function exportToExcel() { const ws = XLSX.utils.table_to_sheet(document.getElementById('mainTable')); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "KPI"); XLSX.writeFile(wb, "KPI_Report.xlsx"); }
-export function toggleNotifications() { const menu = document.getElementById('notifDropdown'); menu.style.display = (menu.style.display === 'none') ? 'block' : 'none'; }
-export function printReport() { const d = new Date(); document.getElementById('printDate').innerText = d.toLocaleDateString('ar-SA'); window.print(); }
