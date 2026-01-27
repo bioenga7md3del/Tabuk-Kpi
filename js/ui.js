@@ -12,6 +12,25 @@ style.innerHTML = `
     .notif-item:hover { background: #f9f9f9; }
     .notif-urgent { border-right: 3px solid #e74c3c; } 
     .notif-warning { border-right: 3px solid #f39c12; }
+    
+    /* ستايل التلميح الذكي */
+    #global-tooltip {
+        position: fixed;
+        background: rgba(44, 62, 80, 0.95);
+        color: #fff;
+        padding: 10px 15px;
+        border-radius: 8px;
+        font-size: 12px;
+        z-index: 9999;
+        pointer-events: none;
+        display: none;
+        white-space: pre-line;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        text-align: right;
+        border: 1px solid rgba(255,255,255,0.1);
+        line-height: 1.6;
+    }
+
     @media print { 
         body * { visibility: hidden; } 
         #mainTable, #mainTable *, #printHeader, #printHeader * { visibility: visible; } 
@@ -25,10 +44,41 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-// --- 1. Helpers ---
-export function initTooltip() { if (!document.getElementById('global-tooltip')) document.body.appendChild(document.createElement('div')).id = 'global-tooltip'; }
-export function showTooltip(e, text) { const t = document.getElementById('global-tooltip'); if (t && text) { t.innerText = text; t.style.display = 'block'; t.style.top = (e.clientY + 15) + 'px'; t.style.left = (e.clientX + 15) + 'px'; } }
-export function hideTooltip() { const t = document.getElementById('global-tooltip'); if (t) t.style.display = 'none'; }
+// --- 1. Tooltip Logic ---
+export function initTooltip() { 
+    if (!document.getElementById('global-tooltip')) {
+        const div = document.createElement('div'); 
+        div.id = 'global-tooltip'; 
+        document.body.appendChild(div);
+    }
+}
+
+// دالة إظهار التلميح
+window.showTooltip = function(e, text) { 
+    const t = document.getElementById('global-tooltip'); 
+    if (t && text) { 
+        t.innerText = text; 
+        t.style.display = 'block'; 
+        
+        // حساب المكان لضمان عدم خروجه من الشاشة
+        let top = e.clientY + 15;
+        let left = e.clientX + 15;
+        if (left + 220 > window.innerWidth) left = e.clientX - 225; // إزاحة لليسار إذا كان في أقصى اليمين
+        if (top + 150 > window.innerHeight) top = e.clientY - 150; // إزاحة للأعلى إذا كان في الأسفل
+
+        t.style.top = top + 'px'; 
+        t.style.left = left + 'px'; 
+    } 
+};
+
+// دالة إخفاء التلميح
+window.hideTooltip = function() { 
+    const t = document.getElementById('global-tooltip'); 
+    if (t) t.style.display = 'none'; 
+};
+
+// التأكد من تشغيل التلميح عند التحميل
+initTooltip();
 
 function getContractStatus(start, end) {
     if(!start || !end) return { text: "غير محدد", badge: "badge-grey" };
@@ -86,7 +136,6 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     tbody.innerHTML = '';
     let rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
 
-    // الفلترة الإجبارية للصلاحيات
     if (userRole === 'medical') rows = rows.filter(r => r.type === 'طبي');
     if (userRole === 'non_medical') rows = rows.filter(r => r.type === 'غير طبي');
 
@@ -122,17 +171,32 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 if (mIdx > -1) {
                     const cellDate = new Date(parseInt(mYear), mIdx, 1);
                     const isEnded = cellDate < currentMonthStart;
-                    if (cellDate >= contractStartDate && isEnded && m.financeStatus === 'late') late++;
+                    if (cellDate >= contractStartDate && isEnded && m.financeStatus === 'late') {
+                        late++;
+                    }
                 }
             });
         }
         
         const badge = late > 0 ? 'badge-red' : 'badge-green';
         const st = getContractStatus(row.startDate, row.endDate);
+        const valFmt = row.value ? Number(row.value).toLocaleString() : '-';
+        
+        // --- 1. إعداد نص التلميح لنوع العقد ---
+        const contractTip = `📄 رقم العقد: ${row.contractNumber||'-'}\n💰 القيمة: ${valFmt}\n⏳ المدة: ${row.duration||'-'}\n📅 البداية: ${row.startDate||'-'}\n📅 النهاية: ${row.endDate||'-'}\n📊 الحالة: ${st.text}`;
+
         const tr = document.createElement('tr');
         tr.className = row.type === 'طبي' ? 'row-medical' : 'row-non-medical';
         
-        tr.innerHTML = `<td class="sticky-col-1">${cTitle} <span class="badge ${st.badge}" style="font-size:9px;">${st.text}</span></td><td class="sticky-col-2"><span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span></td><td class="sticky-col-3">${cName}</td><td><span class="badge ${badge}">${late}</span></td>`;
+        // تطبيق التلميح على خلية "النوع"
+        tr.innerHTML = `
+            <td class="sticky-col-1">${cTitle} <span class="badge ${st.badge}" style="font-size:9px;">${st.text}</span></td>
+            <td class="sticky-col-2" onmousemove="window.showTooltip(event, '${contractTip.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()" style="cursor:help">
+                <span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span>
+            </td>
+            <td class="sticky-col-3">${cName}</td>
+            <td><span class="badge ${badge}">${late}</span></td>
+        `;
 
         if (filteredColumns.length > 0) {
             filteredColumns.forEach(col => {
@@ -148,11 +212,34 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 const isClosingPeriod = cellDate > closingPeriodStart && cellDate <= contractEndDate;
                 const isCurrentMonth = cellDate.getTime() === currentMonthStart.getTime();
 
-                let ic='✘', cl='status-late', ti='لم يرفع';
-                if(md.financeStatus === 'sent') { ic='✅'; cl='status-ok'; ti=`مطالبة: ${md.claimNum||'-'}`; }
-                else if(md.financeStatus === 'returned') { ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}`; }
-                else if (isBeforeContract) { ic='-'; cl=''; ti='مغلق'; }
-                else if (isCurrentMonth) { ic='⏳'; cl=''; ti='جاري'; }
+                let ic='✘', cl='status-late';
+                // --- 2. إعداد نص التلميح للشهر (المطالبة، الخطاب، الفترة) ---
+                let ti = 'لم يرفع'; // النص الأساسي
+
+                // تحديد نص الفترة
+                let periodLabel = "";
+                if (isDirectPurchase) periodLabel = "\n(شراء مباشر)";
+                else if (isDuringExtension) periodLabel = "\n(فترة تمديد 10%)";
+                else if (isClosingPeriod) periodLabel = "\n(فترة ختامية)";
+
+                if(md.financeStatus === 'sent') { 
+                    ic='✅'; cl='status-ok'; 
+                    ti=`مطالبة: ${md.claimNum||'-'}\nخطاب: ${md.letterNum||'-'}${periodLabel}`; 
+                }
+                else if(md.financeStatus === 'returned') { 
+                    ic='⚠️'; cl='status-returned'; 
+                    ti=`إعادة: ${md.returnNotes||'-'}${periodLabel}`; 
+                }
+                else if (isBeforeContract) { 
+                    ic='-'; cl=''; ti='قبل بداية العقد (مغلق)'; 
+                }
+                else if (isCurrentMonth) { 
+                    ic='⏳'; cl=''; ti='الشهر الجاري (لم ينتهِ بعد)'; 
+                }
+                else {
+                    // إذا كان متأخر
+                    ti += periodLabel; // إضافة نص الفترة حتى لو متأخر
+                }
 
                 let highlightStyle = "";
                 if (sClaim !== "" && md.claimNum && md.claimNum.toString().includes(sClaim)) {
@@ -168,7 +255,12 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 const canClick = (userRole !== 'viewer') && canEditFunc(userRole, row.type) && !isBeforeContract;
                 const clickAttr = canClick ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
                 
-                tr.innerHTML += `<td class="${cl}" style="cursor:${canClick?'pointer':'default'}; ${bgStyle}; ${highlightStyle}" ${clickAttr} title="${ti}">${ic}</td>`;
+                // تطبيق التلميح على الخلية باستخدام onmousemove
+                tr.innerHTML += `<td class="${cl}" style="cursor:${canClick?'pointer':'default'}; ${bgStyle}; ${highlightStyle}" ${clickAttr} 
+                    onmousemove="window.showTooltip(event, '${ti.replace(/\n/g, '\\n')}')" 
+                    onmouseleave="window.hideTooltip()">
+                    ${ic}
+                </td>`;
             });
         } else { tr.innerHTML += `<td>-</td>`; }
         
@@ -192,7 +284,6 @@ export function renderCards(appData, type) {
         const fStatus = document.getElementById('filterContractStatus')?.value || "all";
         let allContracts = Object.entries(appData.contracts);
 
-        // فلترة الكروت
         if (window.userRole === 'medical') allContracts = allContracts.filter(([, r]) => r.type === 'طبي');
         if (window.userRole === 'non_medical') allContracts = allContracts.filter(([, r]) => r.type === 'غير طبي');
 
@@ -212,8 +303,9 @@ export function renderCards(appData, type) {
         filtered.forEach(([id, row]) => {
             const cName = appData.contractors[row.contractorId]?.name || "-";
             const st = getContractStatus(row.startDate, row.endDate);
+            const valFmt = row.value ? Number(row.value).toLocaleString() : '-';
             const div = document.createElement('div'); div.className = 'data-card';
-            div.innerHTML = `<div class="card-header"><div><div class="card-title">${row.contractName||row.hospital}</div><span class="badge ${st.badge}" style="font-size:10px">${st.text}</span></div><span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span></div><div class="card-body"><div class="row"><span>المقاول:</span><b>${cName}</b></div><div class="row"><span>النهاية:</span><b>${row.endDate||'-'}</b></div></div>
+            div.innerHTML = `<div class="card-header"><div><div class="card-title">${row.contractName||row.hospital}</div><span class="badge ${st.badge}" style="font-size:10px">${st.text}</span></div><span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span></div><div class="card-body"><div class="row"><span>المقاول:</span><b>${cName}</b></div><div class="row"><span>القيمة:</span><b>${valFmt}</b></div><div class="row"><span>النهاية:</span><b>${row.endDate||'-'}</b></div></div>
             <div class="card-actions" style="display:${actionDisplay}"><button class="btn-primary" onclick="window.prepareEditContract('${id}')">تعديل</button><button class="btn-danger" onclick="window.deleteContract('${id}')">حذف</button></div>`;
             grid.appendChild(div);
         });
@@ -227,23 +319,10 @@ export function renderCards(appData, type) {
     }
 }
 
-// --- Notifications & Stats ---
-export function checkNotifications(contracts) {
-    const list = document.getElementById('notifList'); const badge = document.getElementById('notifBadge');
-    if (!list || !badge) return;
-    list.innerHTML = ''; let count = 0; const today = new Date(); today.setHours(0,0,0,0);
-    Object.values(contracts).forEach(c => {
-        if (window.userRole === 'medical' && c.type !== 'طبي') return;
-        if (window.userRole === 'non_medical' && c.type !== 'غير طبي') return;
-
-        if (!c.endDate) return;
-        const eDate = new Date(c.endDate); const diffDays = Math.ceil((eDate - today) / (1000 * 60 * 60 * 24));
-        if (diffDays > 0 && diffDays <= 90) { count++; list.innerHTML += `<div class="notif-item notif-urgent"><strong>⏳ قرب انتهاء:</strong> ${c.contractName || c.hospital}<br><span style="color:gray">باقي ${diffDays} يوم.</span></div>`; }
-        const extEndDate = new Date(eDate); extEndDate.setMonth(extEndDate.getMonth() + 6);
-        if (today > eDate && today <= extEndDate) { count++; list.innerHTML += `<div class="notif-item notif-warning"><strong>📈 تمديد:</strong> ${c.contractName || c.hospital}<br><span style="color:gray">فترة 10%</span></div>`; }
-    });
-    if (count > 0) { badge.innerText = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; list.innerHTML = `<div style="padding:15px; text-align:center; color:#777">لا توجد تنبيهات</div>`; }
-}
+export function showToast(msg) { const t = document.getElementById("toast"); if(t) { t.innerText = msg; t.className = "show"; setTimeout(() => t.className = "", 2500); } }
+export function exportToExcel() { const ws = XLSX.utils.table_to_sheet(document.getElementById('mainTable')); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "KPI"); XLSX.writeFile(wb, "KPI_Report.xlsx"); }
+export function toggleNotifications() { const menu = document.getElementById('notifDropdown'); menu.style.display = (menu.style.display === 'none') ? 'block' : 'none'; }
+export function printReport() { const d = new Date(); document.getElementById('printDate').innerText = d.toLocaleDateString('ar-SA'); window.print(); }
 
 export function updateStats(rows, appData, selectedYear) {
     if (!rows || !appData) return;
@@ -284,7 +363,19 @@ export function updateStats(rows, appData, selectedYear) {
     if (ctx) { if(window.myChart) window.myChart.destroy(); window.myChart = new Chart(ctx, { type: 'doughnut', data: { labels:['مرفوع','متأخر'], datasets:[{data:[totalSubmitted, effectiveTotalCells-totalSubmitted], backgroundColor:['#27ae60','#c0392b']}] }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } }); }
 }
 
-export function showToast(msg) { const t = document.getElementById("toast"); if(t) { t.innerText = msg; t.className = "show"; setTimeout(() => t.className = "", 2500); } }
-export function exportToExcel() { const ws = XLSX.utils.table_to_sheet(document.getElementById('mainTable')); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "KPI"); XLSX.writeFile(wb, "KPI_Report.xlsx"); }
-export function toggleNotifications() { const menu = document.getElementById('notifDropdown'); menu.style.display = (menu.style.display === 'none') ? 'block' : 'none'; }
-export function printReport() { const d = new Date(); document.getElementById('printDate').innerText = d.toLocaleDateString('ar-SA'); window.print(); }
+export function checkNotifications(contracts) {
+    const list = document.getElementById('notifList'); const badge = document.getElementById('notifBadge');
+    if (!list || !badge) return;
+    list.innerHTML = ''; let count = 0; const today = new Date(); today.setHours(0,0,0,0);
+    Object.values(contracts).forEach(c => {
+        if (window.userRole === 'medical' && c.type !== 'طبي') return;
+        if (window.userRole === 'non_medical' && c.type !== 'غير طبي') return;
+
+        if (!c.endDate) return;
+        const eDate = new Date(c.endDate); const diffDays = Math.ceil((eDate - today) / (1000 * 60 * 60 * 24));
+        if (diffDays > 0 && diffDays <= 90) { count++; list.innerHTML += `<div class="notif-item notif-urgent"><strong>⏳ قرب انتهاء:</strong> ${c.contractName || c.hospital}<br><span style="color:gray">باقي ${diffDays} يوم.</span></div>`; }
+        const extEndDate = new Date(eDate); extEndDate.setMonth(extEndDate.getMonth() + 6);
+        if (today > eDate && today <= extEndDate) { count++; list.innerHTML += `<div class="notif-item notif-warning"><strong>📈 تمديد:</strong> ${c.contractName || c.hospital}<br><span style="color:gray">فترة 10%</span></div>`; }
+    });
+    if (count > 0) { badge.innerText = count; badge.style.display = 'block'; } else { badge.style.display = 'none'; list.innerHTML = `<div style="padding:15px; text-align:center; color:#777">لا توجد تنبيهات</div>`; }
+}
