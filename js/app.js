@@ -1,6 +1,8 @@
 // js/app.js
 import * as DB from './db.js';
 import * as UI from './ui.js';
+// أضف السطر ده في الأول مع الـ imports
+import * as PrintSystem from './print.js';
 
 let appData = { contracts: {}, contractors: {}, monthNames: [] };
 window.userRole = null; // 'super', 'medical', 'non_medical', 'viewer'
@@ -455,4 +457,8 @@ window.switchTab = function(tabName) {
 window.renderCards = function(type) { UI.renderCards(appData, type); };
 window.exportToExcel = function() { UI.exportToExcel(); };
 window.toggleNotifications = function() { UI.toggleNotifications(); };
-window.printReport = function() { UI.printReport(); };
+// js/app.js (في النهاية)
+window.printReport = function() {
+    // نرسل البيانات الحالية والسنة المختارة والصلاحية لملف الطباعة
+    PrintSystem.openPrintPage(appData, window.selectedYear, window.userRole);
+};
