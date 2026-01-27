@@ -92,3 +92,9 @@ export function resetDatabase() {
 export function savePasswords(passwords) {
     return set(ref(db, 'app_settings/passwords'), passwords);
 }
+// أضف هذا في آخر سطر في ملف js/db.js
+
+// دالة لجلب كامل قاعدة البيانات للنسخ الاحتياطي
+export function getAllData() {
+    return get(ref(db, 'app_db_v2'));
+}
