@@ -74,3 +74,24 @@ export async function deleteData(path) {
 export function getAllData() {
     return get(ref(db, 'app_db_v2'));
 }
+// js/db.js
+// ... (نفس الكود السابق للمكتبات والإعدادات والدوال العامة) ...
+
+// (أضف هذا في نهاية الملف)
+
+// 6. دوال إدارة كلمات المرور
+export async function getPasswords() {
+    try {
+        const snapshot = await get(child(ref(db), 'app_settings/passwords'));
+        if (snapshot.exists()) return snapshot.val();
+        // كلمات المرور الافتراضية في حال عدم وجودها في القاعدة
+        return { super: 'super123', admin: 'admin123' };
+    } catch (error) {
+        console.error("خطأ في جلب كلمات المرور", error);
+        return { super: 'super123', admin: 'admin123' };
+    }
+}
+
+export async function savePasswords(passwords) {
+    return set(ref(db, 'app_settings/passwords'), passwords);
+}
