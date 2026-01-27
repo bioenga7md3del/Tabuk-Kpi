@@ -132,3 +132,41 @@ tr.row-non-medical td.sticky-col-1, tr.row-non-medical td.sticky-col-3 { backgro
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 }
+/* --- تحسين النافذة المنبثقة (Popup Styling) --- */
+.popup-form-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* عمودين */
+    gap: 15px;
+    text-align: right;
+    margin-top: 10px;
+}
+
+.popup-full-width {
+    grid-column: span 2; /* يأخذ العرض كامل */
+}
+
+.popup-label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: var(--secondary);
+    font-size: 12px;
+}
+
+/* تحسين حقول الإدخال داخل النافذة */
+.swal2-popup .swal2-input, 
+.swal2-popup .swal2-textarea, 
+.swal2-popup .swal2-select {
+    margin: 0 !important;
+    width: 100% !important;
+    font-size: 13px !important;
+    box-sizing: border-box;
+    border: 1px solid #ddd;
+    box-shadow: none;
+    transition: 0.3s;
+}
+
+.swal2-popup .swal2-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 5px rgba(0, 86, 179, 0.2);
+}
