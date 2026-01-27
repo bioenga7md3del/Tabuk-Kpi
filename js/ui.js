@@ -1,31 +1,45 @@
 // js/ui.js
 
-// --- 0. إضافة ألوان جديدة ودليل الألوان (CSS Injection) ---
+// --- 0. إضافة ستايلات خاصة (ألوان، طباعة، تنبيهات) ---
 const style = document.createElement('style');
 style.innerHTML = `
-  .badge-purple { background-color: #9b59b6; color: white; }
-  .badge-dark { background-color: #34495e; color: white; }
-  
-  /* تنسيق دليل الألوان */
-  #kpi-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-    padding: 15px;
-    background: #fff;
-    border: 1px solid #eee;
-    margin-top: 15px;
-    margin-bottom: 30px;
-    font-size: 13px;
-    justify-content: center;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-  }
-  .legend-item { display: flex; align-items: center; gap: 8px; font-weight: bold; color: #555; }
-  .legend-box { width: 18px; height: 18px; border: 1px solid #ddd; border-radius: 4px; box-shadow: inset 0 0 2px rgba(0,0,0,0.1); }
+    /* ألوان حالات العقد */
+    .badge-purple { background-color: #9b59b6; color: white; }
+    .badge-dark { background-color: #34495e; color: white; }
+    
+    /* تنسيق الطباعة (Print Styles) */
+    @media print {
+        body * { visibility: hidden; }
+        #mainTable, #mainTable *, #printHeader, #printHeader * { visibility: visible; }
+        #printHeader { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
+        .table-container { position: absolute; top: 120px; left: 0; width: 100%; overflow: visible !important; }
+        /* إخفاء العناصر غير المرغوبة */
+        .btn-primary, .btn-secondary, .btn-danger, .filters-section, 
+        .year-tabs, #dashboardControls, #kpi-legend, .card-grid, 
+        h1, .login-container, .tabs, .header-actions { display: none !important; }
+        /* تحسين الجدول */
+        table { width: 100% !important; border-collapse: collapse; font-size: 10pt; }
+        th, td { border: 1px solid #000 !important; color: #000 !important; }
+        .badge { border: 1px solid #000; background: none !important; color: #000 !important; }
+        td { -webkit-print-color-adjust: exact; }
+    }
+    
+    /* تنسيق دليل الألوان */
+    #kpi-legend {
+        display: flex; flex-wrap: wrap; gap: 20px; padding: 15px;
+        background: #fff; border: 1px solid #eee; margin-top: 15px; margin-bottom: 30px;
+        font-size: 13px; justify-content: center; border-radius: 8px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-weight: bold; color: #555; }
+    .legend-box { width: 18px; height: 18px; border: 1px solid #ddd; border-radius: 4px; }
+    
+    /* تنسيق قائمة التنبيهات */
+    .notif-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 12px; color: #333; cursor: pointer; text-align: right;}
+    .notif-item:hover { background: #f9f9f9; }
+    .notif-urgent { border-right: 3px solid #e74c3c; } 
+    .notif-warning { border-right: 3px solid #f39c12; }
 `;
 document.head.appendChild(style);
-
 
 // --- 1. Tooltip ---
 export function initTooltip() {
@@ -48,7 +62,7 @@ export function showTooltip(e, text) {
 }
 export function hideTooltip() { const t = document.getElementById('global-tooltip'); if (t) t.style.display = 'none'; }
 
-// --- 2. Contract Status ---
+// --- 2. Contract Status (تحديد الحالة الزمنية) ---
 function getContractStatus(start, end) {
     if(!start || !end) return { text: "غير محدد", badge: "badge-grey" };
     
@@ -56,7 +70,6 @@ function getContractStatus(start, end) {
     const sDate = new Date(start); 
     const eDate = new Date(end);
     
-    // نهاية التمديد (6 أشهر)
     const extensionEndDate = new Date(eDate);
     extensionEndDate.setMonth(extensionEndDate.getMonth() + 6);
 
@@ -92,11 +105,8 @@ export function renderYearTabs(contracts, selectedYear) {
             }
         });
     }
-
     const sortedYears = [];
-    for (let y = minYear; y <= currentYear; y++) {
-        sortedYears.push(y);
-    }
+    for (let y = minYear; y <= currentYear; y++) sortedYears.push(y);
 
     let html = `<span class="year-label">السنة المالية:</span>`;
     sortedYears.forEach(y => {
@@ -108,7 +118,7 @@ export function renderYearTabs(contracts, selectedYear) {
     container.style.display = 'flex';
 }
 
-// --- 4. Render Legend ---
+// --- 4. Render Legend (دليل الألوان) ---
 function renderLegend() {
     const table = document.getElementById('mainTable');
     if (!table) return;
@@ -117,17 +127,18 @@ function renderLegend() {
     const legendDiv = document.createElement('div');
     legendDiv.id = 'kpi-legend';
     legendDiv.innerHTML = `
-        <div class="legend-item"><div class="legend-box" style="background:#fff"></div><span>الفترة الأساسية</span></div>
-        <div class="legend-item"><div class="legend-box" style="background:#ffe0b2; border-color:#e67e22"></div><span>فترة ختامية (آخر 5 شهور)</span></div>
+        <div class="legend-item"><div class="legend-box" style="background:#fff"></div><span>فترة أساسية</span></div>
+        <div class="legend-item"><div class="legend-box" style="background:#ffe0b2; border-color:#e67e22"></div><span>فترة ختامية (5 شهور)</span></div>
         <div class="legend-item"><div class="legend-box" style="background:#f3e5f5; border-color:#9b59b6"></div><span>تمديد 10%</span></div>
         <div class="legend-item"><div class="legend-box" style="background:#e3f2fd; border-color:#34495e"></div><span>شراء مباشر</span></div>
         <div class="legend-item"><div class="legend-box" style="background:#f9f9f9"></div><span>ما قبل العقد (مغلق)</span></div>
+        <div class="legend-item"><span>⏳</span><span>شهر جاري</span></div>
+        <div class="legend-item"><span>📎</span><span>يوجد مرفق</span></div>
     `;
-    
     table.parentNode.insertBefore(legendDiv, table.nextSibling);
 }
 
-// --- 5. Render Table ---
+// --- 5. Render Table (الجدول الرئيسي) ---
 export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const { contracts, contractors, monthNames } = appData;
     const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
@@ -159,7 +170,6 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="15" style="padding:20px;color:#777">لا توجد بيانات</td></tr>`; return []; }
 
     const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
-    
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -167,13 +177,11 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         const cName = contractors[r.contractorId]?.name || "";
         const cTitle = r.contractName || r.hospital || "";
         const hasClaim = sClaim === "" || (r.months || []).some(m => m.claimNum && m.claimNum.toLowerCase().includes(sClaim));
-        
         let showContract = true;
         if (r.startDate) {
             const startYear = new Date(r.startDate).getFullYear();
             if (startYear > selectedYear) showContract = false;
         }
-
         return (cTitle).toLowerCase().includes(sHosp) && cName.toLowerCase().includes(sCont) && (filter === 'all' || r.type === filter) && hasClaim && showContract;
     });
 
@@ -195,6 +203,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         const extensionEndDate = new Date(contractEndDate);
         extensionEndDate.setMonth(extensionEndDate.getMonth() + 6);
 
+        // --- حساب التأخير (الذكي) ---
         let late = 0;
         if (row.months && monthNames) {
             row.months.forEach((m, idx) => {
@@ -204,7 +213,8 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 const mIdx = arMonths.indexOf(mAr);
                 if (mIdx > -1) {
                     const cellDate = new Date(parseInt(mYear), mIdx, 1);
-                    const isEnded = cellDate < currentMonthStart;
+                    const isEnded = cellDate < currentMonthStart; // انتهى الشهر
+                    // التأخير يحسب فقط إذا بدأ العقد وانتهى الشهر
                     if (cellDate >= contractStartDate && isEnded && m.financeStatus === 'late') {
                         late++;
                     }
@@ -231,21 +241,21 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
             filteredColumns.forEach(col => {
                 const originalIndex = col.index;
                 const md = (row.months && row.months[originalIndex]) ? row.months[originalIndex] : {financeStatus:'late'};
-                
+                const hasLink = md.docLink && md.docLink.trim() !== ""; // هل يوجد رابط؟
+
                 const mName = col.name;
                 const [mAr, mYear] = mName.split(' ');
                 const mIdx = arMonths.indexOf(mAr);
                 const cellDate = new Date(parseInt(mYear), mIdx, 1);
                 
+                // تحديد نوع الفترة
                 const isBeforeContract = cellDate < contractStartDate;
                 const isDirectPurchase = cellDate > extensionEndDate;
                 const isDuringExtension = cellDate > contractEndDate && cellDate <= extensionEndDate;
                 const isClosingPeriod = cellDate > closingPeriodStart && cellDate <= contractEndDate;
-                
                 const isCurrentMonth = cellDate.getTime() === currentMonthStart.getTime();
 
                 let ic='✘', cl='status-late', ti='لم يرفع';
-                
                 let periodLabel = "";
                 if (isDirectPurchase) periodLabel = "\n(شراء مباشر)";
                 else if (isDuringExtension) periodLabel = "\n(فترة تمديد 10%)";
@@ -257,44 +267,37 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 else if(md.financeStatus === 'returned') { 
                     ic='⚠️'; cl='status-returned'; ti=`إعادة: ${md.returnNotes||'-'}${periodLabel}`; 
                 }
-                else if (isBeforeContract) { 
-                    ic='-'; cl=''; ti='قبل بداية العقد (مغلق)';
-                }
-                else if (isCurrentMonth) {
-                    ic='⏳'; cl=''; ti='الشهر الجاري (لم ينتهِ بعد)'; 
-                }
-                else {
-                    ti += periodLabel;
+                else if (isBeforeContract) { ic='-'; cl=''; ti='قبل بداية العقد (مغلق)'; }
+                else if (isCurrentMonth) { ic='⏳'; cl=''; ti='الشهر الجاري (لم ينتهِ بعد)'; }
+                else { ti += periodLabel; }
+
+                // إضافة أيقونة الرابط
+                let linkIcon = '';
+                if (hasLink) {
+                    // e.stopPropagation() لمنع فتح نافذة التعديل عند الضغط على الرابط
+                    linkIcon = `<a href="${md.docLink}" target="_blank" onclick="event.stopPropagation()" style="position:absolute; top:2px; left:2px; font-size:10px; text-decoration:none;">📎</a>`;
                 }
 
                 const highlight = (sClaim !== "" && md.claimNum && md.claimNum.toLowerCase().includes(sClaim)) ? "border: 2px solid blue;" : "";
                 
-                // --- 🔥 الشرط الجديد: منع النقر إذا كان قبل العقد 🔥 ---
+                // --- ⛔ منع النقر لما قبل العقد ---
                 const canClick = canEditFunc(userRole, row.type) && !isBeforeContract;
-                
                 const clickAttr = canClick ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
-                const cursor = canClick ? 'pointer' : 'default'; // تغيير شكل الماوس أيضاً
+                const cursor = canClick ? 'pointer' : 'default';
 
+                // --- 🎨 التلوين ---
                 let bgStyle = '';
-                
-                if (isBeforeContract) {
-                    bgStyle = 'background:#f9f9f9; color:#ccc;'; 
-                } 
-                else if (isDirectPurchase) {
-                    bgStyle = 'background:#e3f2fd; border-bottom: 2px solid #34495e;'; 
-                }
-                else if (isDuringExtension) {
-                    bgStyle = 'background:#f3e5f5; border-bottom: 2px solid #9b59b6;'; 
-                }
-                else if (isClosingPeriod) {
-                    bgStyle = 'background:#ffe0b2; border-bottom: 2px solid #e67e22;'; 
-                }
+                if (isBeforeContract) bgStyle = 'background:#f9f9f9; color:#ccc;'; 
+                else if (isDirectPurchase) bgStyle = 'background:#e3f2fd; border-bottom: 2px solid #34495e;'; 
+                else if (isDuringExtension) bgStyle = 'background:#f3e5f5; border-bottom: 2px solid #9b59b6;'; 
+                else if (isClosingPeriod) bgStyle = 'background:#ffe0b2; border-bottom: 2px solid #e67e22;'; 
                 
                 if (isCurrentMonth && md.financeStatus === 'late') {
                     bgStyle = 'background:#fffbf0; color:#f39c12; border: 2px dashed #f39c12;';
                 }
 
-                tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}; ${highlight}; ${bgStyle}" ${clickAttr}>
+                tr.innerHTML += `<td class="${cl}" style="cursor:${cursor}; ${highlight}; ${bgStyle}; position:relative;" ${clickAttr}>
+                    ${linkIcon}
                     <div onmousemove="window.showTooltip(event, '${ti.replace(/\n/g, '\\n')}')" onmouseleave="window.hideTooltip()">${ic}</div>
                 </td>`;
             });
@@ -304,80 +307,17 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         tr.innerHTML += `<td ${en} style="cursor:${canEditFunc(userRole, row.type)?'pointer':'default'}; font-size:11px;">${row.notes||''}</td>`;
         tbody.appendChild(tr);
     });
-
     return filtered;
 }
 
-// --- 6. Render Cards & Update Stats (يستمر الكود كما هو بالأسفل) ---
-
-export function renderCards(appData, type) {
-    const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
-    if (!grid) return;
-    grid.innerHTML = '';
-    
-    if (type === 'contract') {
-        const fName = document.getElementById('filterContractName')?.value.toLowerCase() || "";
-        const fStatus = document.getElementById('filterContractStatus')?.value || "all";
-        const fType = document.getElementById('filterContractType2')?.value || "all";
-        let activeCount = 0, soonCount = 0, expiredCount = 0, totalMed = 0, totalNonMed = 0;
-        const allContracts = Object.entries(appData.contracts);
-        allContracts.forEach(([, row]) => {
-            const st = getContractStatus(row.startDate, row.endDate);
-            if(st.text === 'ساري') activeCount++;
-            if(st.text === 'على وشك الانتهاء') soonCount++;
-            if(st.text === 'منتهي') expiredCount++;
-            const val = parseFloat(row.value) || 0;
-            if(row.type === 'طبي') totalMed += val;
-            if(row.type === 'غير طبي') totalNonMed += val;
-        });
-        if(document.getElementById('cardActiveContracts')) {
-            document.getElementById('cardActiveContracts').innerText = activeCount;
-            document.getElementById('cardSoonContracts').innerText = soonCount;
-            document.getElementById('cardExpiredContracts').innerText = expiredCount;
-            document.getElementById('cardTotalMedical').innerText = totalMed.toLocaleString() + ' ريال';
-            document.getElementById('cardTotalNonMedical').innerText = totalNonMed.toLocaleString() + ' ريال';
-        }
-        const filtered = allContracts.filter(([, row]) => {
-            const name = row.contractName || row.hospital || "";
-            const st = getContractStatus(row.startDate, row.endDate);
-            const matchName = name.toLowerCase().includes(fName);
-            let matchStatus = false;
-            if (fStatus === 'all') matchStatus = true;
-            else if (fStatus === 'active' && st.text === 'ساري') matchStatus = true;
-            else if (fStatus === 'soon' && st.text === 'على وشك الانتهاء') matchStatus = true;
-            else if (fStatus === 'expired' && st.text === 'منتهي') matchStatus = true;
-            const matchType = fType === 'all' || row.type === fType;
-            return matchName && matchStatus && matchType;
-        });
-        filtered.sort(([,a], [,b]) => (a.contractName||a.hospital||"").localeCompare(b.contractName||b.hospital||"", 'ar'));
-        filtered.forEach(([id, row]) => {
-            const cName = appData.contractors[row.contractorId]?.name || "-";
-            const st = getContractStatus(row.startDate, row.endDate);
-            const name = row.contractName || row.hospital;
-            const valFmt = row.value ? Number(row.value).toLocaleString() : '-';
-            const div = document.createElement('div'); div.className = 'data-card';
-            div.innerHTML = `<div class="card-header"><div><div class="card-title">${name}</div><span class="badge ${st.badge}" style="font-size:10px">${st.text}</span></div><span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span></div><div class="card-body"><div class="row"><span>المقاول:</span><b>${cName}</b></div><div class="row"><span>القيمة:</span><b>${valFmt}</b></div><div class="row"><span>النهاية:</span><b>${row.endDate||'-'}</b></div></div><div class="card-actions"><button class="btn-primary" onclick="window.prepareEditContract('${id}')">تعديل</button><button class="btn-danger" onclick="window.deleteContract('${id}')">حذف</button></div>`;
-            grid.appendChild(div);
-        });
-    } else {
-        Object.entries(appData.contractors).forEach(([id, row]) => {
-            const div = document.createElement('div'); div.className = 'data-card';
-            div.innerHTML = `<div class="card-header" style="border:none"><div class="card-title">${row.name}</div></div><div class="card-actions"><button class="btn-primary" onclick="window.prepareEditContractor('${id}','${row.name}')">تعديل</button><button class="btn-danger" onclick="window.deleteContractor('${id}')">حذف</button></div>`;
-            grid.appendChild(div);
-        });
-    }
-}
-
+// --- 6. Update Stats (مع منطق الاستثناء) ---
 export function updateStats(rows, appData, selectedYear) {
     if (!rows || !appData) return;
     const validIndices = [];
     if (appData.monthNames) {
-        appData.monthNames.forEach((m, i) => {
-            if (m.includes(selectedYear)) validIndices.push(i);
-        });
+        appData.monthNames.forEach((m, i) => { if (m.includes(selectedYear)) validIndices.push(i); });
     }
     let totalLate = 0, totalSubmitted = 0;
-    
     const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
     let effectiveTotalCells = 0;
     const now = new Date();
@@ -386,14 +326,12 @@ export function updateStats(rows, appData, selectedYear) {
     rows.forEach(r => {
         const contractStartDate = new Date(r.startDate);
         contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
-
         if (r.months) {
             validIndices.forEach(idx => {
                 const mName = appData.monthNames[idx];
                 const [mAr, mYear] = mName.split(' ');
                 const mIdx = arMonths.indexOf(mAr);
                 const cellDate = new Date(parseInt(mYear), mIdx, 1);
-                
                 const isEnded = cellDate < currentMonthStart;
 
                 if (cellDate >= contractStartDate && isEnded) {
@@ -405,10 +343,7 @@ export function updateStats(rows, appData, selectedYear) {
                     }
                 } else if (cellDate >= contractStartDate && !isEnded) {
                     const m = r.months[idx];
-                    if (m && m.financeStatus === 'sent') {
-                        effectiveTotalCells++;
-                        totalSubmitted++;
-                    }
+                    if (m && m.financeStatus === 'sent') { effectiveTotalCells++; totalSubmitted++; }
                 }
             });
         }
@@ -426,7 +361,6 @@ export function updateStats(rows, appData, selectedYear) {
     const elLate = document.getElementById('countLate'); if (elLate) elLate.innerText = totalLate;
     const elActive = document.getElementById('countActive'); if (elActive) elActive.innerText = active;
     const elExpired = document.getElementById('countExpired'); if (elExpired) elExpired.innerText = expired;
-    
     const elComp = document.getElementById('complianceRate'); if(elComp) elComp.innerText = effectiveTotalCells > 0 ? Math.round((totalSubmitted/effectiveTotalCells)*100)+'%' : '0%';
     
     const ctx = document.getElementById('kpiChart')?.getContext('2d');
@@ -436,12 +370,100 @@ export function updateStats(rows, appData, selectedYear) {
     }
 }
 
-// --- Helpers ---
+// --- 7. Notifications (نظام التنبيهات) ---
+export function checkNotifications(contracts) {
+    const list = document.getElementById('notifList');
+    const badge = document.getElementById('notifBadge');
+    if (!list || !badge) return;
+
+    list.innerHTML = '';
+    let count = 0;
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    Object.values(contracts).forEach(c => {
+        if (!c.endDate) return;
+        const eDate = new Date(c.endDate);
+        const diffTime = eDate - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays > 0 && diffDays <= 90) {
+            count++;
+            list.innerHTML += `<div class="notif-item notif-urgent"><strong>⏳ قرب انتهاء:</strong> ${c.contractName || c.hospital}<br><span style="color:gray">باقي ${diffDays} يوم.</span></div>`;
+        }
+        const extEndDate = new Date(eDate);
+        extEndDate.setMonth(extEndDate.getMonth() + 6);
+        if (today > eDate && today <= extEndDate) {
+            count++;
+            list.innerHTML += `<div class="notif-item notif-warning"><strong>📈 تمديد:</strong> ${c.contractName || c.hospital}<br><span style="color:gray">فترة 10%</span></div>`;
+        }
+    });
+
+    if (count > 0) {
+        badge.innerText = count; badge.style.display = 'block';
+        list.innerHTML += `<div style="padding:5px; text-align:center; font-size:10px; color:#777">-- نهاية التنبيهات --</div>`;
+    } else {
+        badge.style.display = 'none';
+        list.innerHTML = `<div style="padding:15px; text-align:center; color:#777">لا توجد تنبيهات هامة</div>`;
+    }
+}
+
+// --- 8. Helpers (الطباعة والواجهة) ---
+window.printReport = function() {
+    const d = new Date();
+    document.getElementById('printDate').innerText = d.toLocaleDateString('ar-SA');
+    window.print();
+};
+
+window.toggleNotifications = function() {
+    const menu = document.getElementById('notifDropdown');
+    menu.style.display = (menu.style.display === 'none') ? 'block' : 'none';
+};
+// إغلاق القائمة عند النقر خارجها
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('notifDropdown');
+    const btn = document.querySelector('button[onclick="window.toggleNotifications()"]');
+    if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) menu.style.display = 'none';
+});
+
+export function renderCards(appData, type) { /* ... نفس كود الكروت القديم لم يتغير ... */ 
+    const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    if (type === 'contract') {
+        const fName = document.getElementById('filterContractName')?.value.toLowerCase() || "";
+        const fStatus = document.getElementById('filterContractStatus')?.value || "all";
+        const allContracts = Object.entries(appData.contracts);
+        const filtered = allContracts.filter(([, row]) => {
+            const name = row.contractName || row.hospital || "";
+            const st = getContractStatus(row.startDate, row.endDate);
+            const matchName = name.toLowerCase().includes(fName);
+            let matchStatus = false;
+            if (fStatus === 'all') matchStatus = true;
+            else if (fStatus === 'active' && st.text === 'ساري') matchStatus = true;
+            else if (fStatus === 'soon' && st.text === 'على وشك الانتهاء') matchStatus = true;
+            else if (fStatus === 'expired' && st.text === 'منتهي') matchStatus = true;
+            return matchName && matchStatus;
+        });
+        filtered.sort(([,a], [,b]) => (a.contractName||a.hospital||"").localeCompare(b.contractName||b.hospital||"", 'ar'));
+        filtered.forEach(([id, row]) => {
+            const cName = appData.contractors[row.contractorId]?.name || "-";
+            const st = getContractStatus(row.startDate, row.endDate);
+            const name = row.contractName || row.hospital;
+            const div = document.createElement('div'); div.className = 'data-card';
+            div.innerHTML = `<div class="card-header"><div><div class="card-title">${name}</div><span class="badge ${st.badge}" style="font-size:10px">${st.text}</span></div><span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span></div><div class="card-body"><div class="row"><span>المقاول:</span><b>${cName}</b></div><div class="row"><span>النهاية:</span><b>${row.endDate||'-'}</b></div></div><div class="card-actions"><button class="btn-primary" onclick="window.prepareEditContract('${id}')">تعديل</button><button class="btn-danger" onclick="window.deleteContract('${id}')">حذف</button></div>`;
+            grid.appendChild(div);
+        });
+    } else {
+        Object.entries(appData.contractors).forEach(([id, row]) => {
+            const div = document.createElement('div'); div.className = 'data-card';
+            div.innerHTML = `<div class="card-header" style="border:none"><div class="card-title">${row.name}</div></div><div class="card-actions"><button class="btn-primary" onclick="window.prepareEditContractor('${id}','${row.name}')">تعديل</button><button class="btn-danger" onclick="window.deleteContractor('${id}')">حذف</button></div>`;
+            grid.appendChild(div);
+        });
+    }
+}
 export function showToast(msg) { const t = document.getElementById("toast"); if(t) { t.innerText = msg; t.className = "show"; setTimeout(() => t.className = "", 2500); } }
 export function toggleModal(id, show) { const m = document.getElementById(id); if(m) m.style.display = show ? 'flex' : 'none'; }
 export function exportToExcel() {
     const ws = XLSX.utils.table_to_sheet(document.getElementById('mainTable'));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "KPI");
-    XLSX.writeFile(wb, "KPI_Report.xlsx");
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "KPI"); XLSX.writeFile(wb, "KPI_Report.xlsx");
 }
