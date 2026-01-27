@@ -13,12 +13,12 @@
 </head>
 <body>
 
-    <div id="loginScreen" class="login-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh;">
-        <div class="data-card" style="width: 350px; text-align: center;">
-            <h2 style="color: var(--primary);">تسجيل الدخول</h2>
-            <br>
-            <input type="password" id="adminPassword" class="form-control" placeholder="كلمة المرور" style="margin-bottom: 10px;">
-            <button class="btn-primary" style="width: 100%; justify-content: center;" onclick="window.adminLogin()">دخول</button>
+    <div id="loginScreen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f3f4f6;">
+        <div class="data-card" style="width: 350px; text-align: center; padding: 40px;">
+            <img src="TabukCluster.jpeg" style="height: 80px; margin-bottom: 20px; border-radius: 10px;">
+            <h2 style="color: var(--primary); margin-bottom: 20px;">تسجيل الدخول</h2>
+            <input type="password" id="adminPassword" class="form-control" placeholder="كلمة المرور" style="margin-bottom: 15px; width: 100%; text-align: center;">
+            <button class="btn-primary" style="width: 100%; justify-content: center; padding: 12px;" onclick="window.adminLogin()">دخول للنظام</button>
         </div>
     </div>
 
@@ -26,13 +26,14 @@
         
         <nav class="navbar">
             <div class="nav-brand">
-                <span>📊 نظام العقود والمستخلصات</span>
+                <img src="TabukCluster.jpeg" style="height: 45px; border-radius: 5px;">
+                <span>نظام متابعة العقود والمستخلصات</span>
             </div>
             <div class="nav-links">
                 <div class="nav-item active" onclick="window.switchTab('table')">الرئيسية</div>
                 <div class="nav-item" onclick="window.switchTab('contracts')">إدارة العقود</div>
                 <div class="nav-item" onclick="window.switchTab('contractors')">المقاولين</div>
-                <button class="btn-danger btn-sm" onclick="window.logout()">خروج</button>
+                <button class="btn-danger" style="padding: 5px 15px; margin-right: 15px;" onclick="window.logout()">خروج</button>
             </div>
         </nav>
 
@@ -43,7 +44,7 @@
                     <h3 style="margin: 0; color: var(--secondary);">لوحة القيادة</h3>
                 </div>
                 
-                <div style="display: flex; gap: 10px;">
+                <div style="display: flex; gap: 10px; align-items: center;">
                     <div style="position: relative;">
                         <button class="btn-warning" onclick="window.toggleNotifications()">
                             🔔 التنبيهات
@@ -55,7 +56,7 @@
                         </div>
                     </div>
 
-                    <button class="btn-primary" onclick="window.printReport()">🖨️ طباعة</button>
+                    <button class="btn-secondary" onclick="window.printReport()">🖨️ طباعة</button>
                     
                     <button class="btn-success super-admin-only" onclick="window.downloadBackup()">📥 نسخ احتياطي</button>
                     <button class="btn-purple super-admin-only" onclick="window.prepareMonthsUpdate()">📅 تحديث الشهور</button>
@@ -75,8 +76,7 @@
                 </div>
             </div>
 
-            <div id="tab-table" class="page-section active">
-                
+            <div id="tab-table" class="tab-content active">
                 <div class="toolbar-section">
                     <input type="text" id="searchHospital" class="form-control" placeholder="بحث باسم العقد/المستشفى..." onkeyup="window.refreshView()">
                     <input type="text" id="searchContractor" class="form-control" placeholder="بحث بالمقاول..." onkeyup="window.refreshView()">
@@ -89,22 +89,17 @@
                     <button class="btn-success" onclick="window.exportToExcel()">Excel Export</button>
                 </div>
 
-                <div id="yearTabs" class="year-tabs-container">
-                    </div>
+                <div id="yearTabs" class="year-tabs-container"></div>
 
                 <div class="table-wrapper">
                     <table id="mainTable">
-                        <thead>
-                            <tr id="headerRow">
-                                </tr>
-                        </thead>
-                        <tbody id="tableBody">
-                            </tbody>
+                        <thead><tr id="headerRow"></tr></thead>
+                        <tbody id="tableBody"></tbody>
                     </table>
                 </div>
-                </div>
+            </div>
 
-            <div id="tab-contracts" class="page-section">
+            <div id="tab-contracts" class="tab-content">
                 <div class="toolbar-section">
                     <button class="btn-primary" onclick="window.prepareAddContract()">+ إضافة عقد جديد</button>
                     <input type="text" id="filterContractName" class="form-control" placeholder="بحث في العقود..." onkeyup="window.renderCards('contract')">
@@ -118,7 +113,7 @@
                 <div id="contractsGrid" class="cards-grid"></div>
             </div>
 
-            <div id="tab-contractors" class="page-section">
+            <div id="tab-contractors" class="tab-content">
                 <div class="toolbar-section">
                     <button class="btn-primary" onclick="window.prepareAddContractor()">+ إضافة مقاول جديد</button>
                 </div>
@@ -129,9 +124,8 @@
     </div>
 
     <div id="global-tooltip"></div>
-
     <div id="toast">تم الحفظ بنجاح</div>
-
+    
     <div id="printHeader" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:20px;">
             <div style="text-align:right;">
@@ -139,6 +133,7 @@
                 <p>تاريخ التقرير: <span id="printDate"></span></p>
             </div>
             <div style="text-align:left;">
+                <img src="TabukCluster.jpeg" style="height: 60px;">
                 <h3>الإدارة المالية / إدارة العقود</h3>
             </div>
         </div>
