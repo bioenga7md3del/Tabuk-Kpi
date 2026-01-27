@@ -295,6 +295,54 @@ window.systemReset = async function() {
     }
 };
 
+// أضف هذا في ملف js/app.js
+
+window.downloadBackup = async function() {
+    // 1. التحقق من الصلاحية (للسوبر أدمن فقط)
+    if (window.userRole !== 'super') return;
+
+    UI.showToast("⏳ جاري تحضير النسخة الاحتياطية...");
+
+    try {
+        // 2. جلب البيانات من الفيربيز
+        const snapshot = await DB.getAllData();
+        const data = snapshot.val();
+
+        if (!data) {
+            Swal.fire('تنبيه', 'لا توجد بيانات لتحميلها', 'info');
+            return;
+        }
+
+        // 3. تحويل البيانات لملف JSON
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+
+        // 4. تسمية الملف بالتاريخ والوقت
+        const d = new Date();
+        const fileName = `Backup_KPI_${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}_${d.getHours()}-${d.getMinutes()}.json`;
+
+        // 5. إنشاء رابط التحميل والضغط عليه أوتوماتيكياً
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        
+        // تنظيف
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        UI.showToast("✅ تم تحميل النسخة بنجاح");
+
+    } catch (error) {
+        console.error("Backup Error:", error);
+        UI.showToast("❌ حدث خطأ أثناء التحميل");
+    }
+};
+
+
+
 window.changePasswords = async function() {
     if (!window.userRole || window.userRole !== 'super') return;
     const { value: f } = await Swal.fire({
