@@ -108,7 +108,7 @@ export function openPrintPage(appData, selectedYear, userRole) {
             <div class="header-content">
                 <div class="header-right">
                     <h1>تجمع تبوك الصحي</h1>
-                    <p>الإدارة التنفيذية للشئون المالية - إدارة العقود</p>
+                    <p>الإدارة التنفيذية للتشغيل - إدارة الصيانة </p>
                 </div>
                 <div style="text-align:center;">
                     <h2>تقرير متابعة الأداء KPI</h2>
