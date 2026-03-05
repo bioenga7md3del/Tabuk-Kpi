@@ -462,3 +462,46 @@ window.printReport = function() {
     // نرسل البيانات الحالية والسنة المختارة والصلاحية لملف الطباعة
     PrintSystem.openPrintPage(appData, window.selectedYear, window.userRole);
 };
+// دالة إضافة شهر جديد بأمان (متوافقة مع الترتيب المعكوس)
+window.addNewMonthSafely = async function() {
+    if (window.userRole !== 'super') return;
+
+    const { value: newMonth } = await Swal.fire({
+        title: 'إضافة شهر جديد',
+        input: 'text',
+        inputLabel: 'اكتب اسم الشهر والسنة (مثال: فبراير 2026)',
+        inputPlaceholder: 'فبراير 2026',
+        showCancelButton: true,
+        confirmButtonText: 'إضافة',
+        cancelButtonText: 'إلغاء'
+    });
+
+    if (newMonth) {
+        // 1. التأكد من عدم تكرار الشهر
+        if (appData.monthNames && appData.monthNames.includes(newMonth)) {
+            Swal.fire('تنبيه', 'هذا الشهر موجود بالفعل!', 'warning');
+            return;
+        }
+
+        UI.showToast("جاري إضافة الشهر وتهيئة العقود...");
+
+        // 2. إضافة الشهر في أعلى القائمة (Index 0)
+        appData.monthNames.unshift(newMonth); // unshift تضع العنصر في البداية
+        await DB.saveData('app_db_v2/monthNames', appData.monthNames);
+
+        // 3. المرور على كل العقود لترحيل البيانات وتفريغ الخانة الأولى
+        const updates = [];
+        Object.keys(appData.contracts).forEach(id => {
+            const c = appData.contracts[id];
+            let cMonths = c.months || [];
+            // إضافة خانة جديدة فارغة (تأخير افتراضي) في بداية مصفوفة العقد
+            cMonths.unshift({ financeStatus: 'late' }); 
+            updates.push(DB.saveData(`app_db_v2/contracts/${id}/months`, cMonths));
+            c.months = cMonths;
+        });
+
+        await Promise.all(updates);
+        Swal.fire('نجاح', `تم إضافة "${newMonth}" وتحديث الجدول بأمان.`, 'success');
+        refreshView();
+    }
+};
