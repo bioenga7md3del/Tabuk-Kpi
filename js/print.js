@@ -95,7 +95,7 @@ export function openPrintPage(appData, selectedYear, userRole, selectedIds = nul
             <div class="header-content">
                 <div class="header-right">
                     <h1>تجمع تبوك الصحي</h1>
-                    <p>الإدارة التنفيذية للشئون المالية - إدارة العقود</p>
+                    <p>إدارة الصيانة - تجمع تبوك الصحي </p>
                 </div>
                 <div style="text-align:center;">
                     <h2 style="${isLateOnly ? 'color: red;' : ''}">${reportTitle}</h2>
