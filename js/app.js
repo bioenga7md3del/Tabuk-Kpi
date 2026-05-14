@@ -505,6 +505,10 @@ window.addNewMonthSafely = async function() {
         refreshView();
     }
 };
+
+
+////طباعة مخصصة
+
 window.openCustomPrint = async function() {
     const { contracts, monthNames } = appData;
     let rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
@@ -513,12 +517,11 @@ window.openCustomPrint = async function() {
     if (window.userRole === 'non_medical') rows = rows.filter(r => r.type === 'غير طبي');
     rows.sort((a, b) => (a.contractName||a.hospital||"").localeCompare(b.contractName||b.hospital||"", 'ar'));
 
-    // استخراج السنوات المتاحة من قاعدة البيانات
     const availableYears = [...new Set((monthNames || []).map(m => m.split(' ')[1]))].sort();
     
-    // بناء النافذة المنبثقة
+    // بناء النافذة المنبثقة مع إضافة خيارات التمديد والشراء المباشر
     let html = `
-        <div style="background: #f8f9fa; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; text-align:right;">
+        <div style="background: #f8f9fa; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px; text-align:right;">
             <div style="font-weight:bold; margin-bottom: 8px; color:#0056b3;">1. اختر السنوات المطلوب فحصها:</div>
             <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: flex-start;">
                 ${availableYears.map(y => `
@@ -528,6 +531,19 @@ window.openCustomPrint = async function() {
                 `).join('')}
             </div>
         </div>
+
+        <div style="background: #e9ecef; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; text-align:right;">
+            <div style="font-weight:bold; margin-bottom: 8px; color:#333;">2. إعدادات فترات التأخير:</div>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <label style="cursor: pointer; color: #2c3e50;">
+                    <input type="checkbox" id="includeExtension" checked onchange="window.updatePrintPreview()"> تضمين تأخيرات التمديد (10%)
+                </label>
+                <label style="cursor: pointer; color: #2c3e50;">
+                    <input type="checkbox" id="includeDirect" checked onchange="window.updatePrintPreview()"> تضمين تأخيرات الشراء المباشر
+                </label>
+            </div>
+        </div>
+
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px;">
             <label style="font-weight: bold; color: #856404; cursor: pointer;">
                 <input type="checkbox" id="filterLateOnly" onchange="window.updatePrintPreview()" checked>
@@ -540,16 +556,17 @@ window.openCustomPrint = async function() {
                 <option value="غير طبي">غير طبي فقط</option>
             </select>` : ''}
         </div>
-        <div id="printCheckboxList" style="max-height: 250px; overflow-y: auto; text-align: right; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fff;">
-            <!-- سيتم ملؤه آلياً -->
+        <div id="printCheckboxList" style="max-height: 220px; overflow-y: auto; text-align: right; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fff;">
         </div>
     `;
 
-    // الدالة المسؤولة عن تحديث القائمة فوراً عند اختيار أي سنة أو فلتر
     window.updatePrintPreview = function() {
         const selectedYears = Array.from(document.querySelectorAll('.print-year-cb:checked')).map(cb => cb.value);
         const onlyLate = document.getElementById('filterLateOnly')?.checked || false;
         const typeFilter = document.getElementById('filterPrintType')?.value || 'all';
+        const includeExtension = document.getElementById('includeExtension')?.checked || false;
+        const includeDirect = document.getElementById('includeDirect')?.checked || false;
+
         const listContainer = document.getElementById('printCheckboxList');
         if (!listContainer) return;
         
@@ -558,19 +575,41 @@ window.openCustomPrint = async function() {
         const now = new Date(); const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
         rows.forEach(r => {
-            r.lateMonthsList = []; // مصفوفة لتجميع الشهور
+            r.lateMonthsList = []; 
             const contractStartDate = new Date(r.startDate); contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
+            const contractEndDate = new Date(r.endDate); contractEndDate.setDate(1); contractEndDate.setHours(0,0,0,0);
+            const extensionEndDate = new Date(contractEndDate); extensionEndDate.setMonth(extensionEndDate.getMonth() + 6);
             
             if (r.months && monthNames) {
                 monthNames.forEach((mName, idx) => {
                     const [mAr, mYear] = mName.split(' '); 
-                    if (selectedYears.includes(mYear)) { // إذا كانت السنة ضمن المحدد
+                    if (selectedYears.includes(mYear)) { 
                         const md = r.months[idx] || {financeStatus: 'late'};
                         const mIdx = arMonths.indexOf(mAr);
                         const cellDate = new Date(parseInt(mYear), mIdx, 1);
                         
                         if (cellDate >= contractStartDate && cellDate < currentMonthStart && md.financeStatus === 'late') {
-                            r.lateMonthsList.push(mName); // حفظ (مثال: يناير 2024)
+                            
+                            // --- تحديد فترة الشهر وهل نضمه أم لا ---
+                            let periodTag = "";
+                            let shouldInclude = true;
+
+                            if (cellDate <= contractEndDate) {
+                                // 1. فترة أساسية - دائما يتم طباعتها
+                                periodTag = "";
+                            } else if (cellDate > contractEndDate && cellDate <= extensionEndDate) {
+                                // 2. فترة تمديد
+                                if (!includeExtension) shouldInclude = false;
+                                periodTag = " (تمديد)";
+                            } else if (cellDate > extensionEndDate) {
+                                // 3. فترة شراء مباشر
+                                if (!includeDirect) shouldInclude = false;
+                                periodTag = " (مباشر)";
+                            }
+
+                            if (shouldInclude) {
+                                r.lateMonthsList.push(mName + periodTag);
+                            }
                         }
                     }
                 });
@@ -589,7 +628,6 @@ window.openCustomPrint = async function() {
                 listContainer.innerHTML += `
                     <div class="print-item-row" style="margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
                         <label style="cursor: pointer; display: flex; align-items: flex-start; gap: 8px;">
-                            <!-- نخزن النص المجمع في الزر نفسه ليرسله للطباعة -->
                             <input type="checkbox" class="print-contract-cb" value="${r.id}" data-latetext="${r.lateMonthsList.join('، ')}" checked style="margin-top: 4px;">
                             <div style="flex:1;">
                                 <div style="font-weight:bold; color:#333;">${title} <span style="font-size:10px; color:#777; font-weight:normal;">(${r.type})</span></div>
@@ -614,7 +652,6 @@ window.openCustomPrint = async function() {
     });
 
     if (isConfirmed) {
-        // جمع البيانات وتجهيزها للإرسال
         const selectedData = Array.from(document.querySelectorAll('.print-contract-cb:checked'))
             .map(cb => ({ id: cb.value, lateText: cb.getAttribute('data-latetext') }));
                                  
