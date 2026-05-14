@@ -509,129 +509,121 @@ window.openCustomPrint = async function() {
     const { contracts, monthNames } = appData;
     let rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
 
-    // تصفية حسب الصلاحية الأساسية
     if (window.userRole === 'medical') rows = rows.filter(r => r.type === 'طبي');
     if (window.userRole === 'non_medical') rows = rows.filter(r => r.type === 'غير طبي');
-    
     rows.sort((a, b) => (a.contractName||a.hospital||"").localeCompare(b.contractName||b.hospital||"", 'ar'));
 
-    const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
-    const now = new Date(); 
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    // حساب التأخير
-    rows.forEach(r => {
-        r.isLate = false;
-        r.lateMonths = [];
-        const contractStartDate = new Date(r.startDate); contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
-        
-        if (r.months && monthNames) {
-            monthNames.forEach((mName, idx) => {
-                if (mName.includes(window.selectedYear)) {
-                    const md = r.months[idx] || {financeStatus: 'late'};
-                    const [mAr, mYear] = mName.split(' '); 
-                    const mIdx = arMonths.indexOf(mAr);
-                    const cellDate = new Date(parseInt(mYear), mIdx, 1);
-                    
-                    if (cellDate >= contractStartDate && cellDate < currentMonthStart && md.financeStatus === 'late') {
-                        r.isLate = true;
-                        r.lateMonths.push(mAr);
-                    }
-                }
-            });
-        }
-    });
-
-    // إنشاء حقل اختيار نوع العقد (يظهر فقط لمن لديه صلاحية الرؤية الشاملة)
-    let typeSelectHtml = '';
-    if (window.userRole === 'super' || window.userRole === 'viewer') {
-        typeSelectHtml = `
-            <select id="filterPrintType" onchange="window.applyPrintFilters()" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc; font-family: Tajawal;">
+    // استخراج السنوات المتاحة من قاعدة البيانات
+    const availableYears = [...new Set((monthNames || []).map(m => m.split(' ')[1]))].sort();
+    
+    // بناء النافذة المنبثقة
+    let html = `
+        <div style="background: #f8f9fa; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; text-align:right;">
+            <div style="font-weight:bold; margin-bottom: 8px; color:#0056b3;">1. اختر السنوات المطلوب فحصها:</div>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: flex-start;">
+                ${availableYears.map(y => `
+                    <label style="cursor:pointer; background:#fff; padding:4px 8px; border-radius:4px; border:1px solid #ccc;">
+                        <input type="checkbox" class="print-year-cb" value="${y}" ${y == window.selectedYear ? 'checked' : ''} onchange="window.updatePrintPreview()"> ${y}
+                    </label>
+                `).join('')}
+            </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px;">
+            <label style="font-weight: bold; color: #856404; cursor: pointer;">
+                <input type="checkbox" id="filterLateOnly" onchange="window.updatePrintPreview()" checked>
+                عرض المتأخر فقط
+            </label>
+            ${(window.userRole === 'super' || window.userRole === 'viewer') ? `
+            <select id="filterPrintType" onchange="window.updatePrintPreview()" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc; font-family: Tajawal;">
                 <option value="all">الكل (طبي وغير طبي)</option>
                 <option value="طبي">طبي فقط</option>
                 <option value="غير طبي">غير طبي فقط</option>
-            </select>
-        `;
-    }
-
-    // بناء النافذة المنبثقة
-    let html = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px;">
-            <label style="font-weight: bold; color: #e74c3c; cursor: pointer;">
-                <input type="checkbox" id="filterLateOnly" onchange="window.applyPrintFilters()" checked>
-                عرض المتأخر فقط
-            </label>
-            ${typeSelectHtml}
+            </select>` : ''}
         </div>
-        <div id="printCheckboxList" style="max-height: 300px; overflow-y: auto; text-align: right; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fff;">
+        <div id="printCheckboxList" style="max-height: 250px; overflow-y: auto; text-align: right; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fff;">
+            <!-- سيتم ملؤه آلياً -->
+        </div>
     `;
 
-    rows.forEach(r => {
-        const title = r.contractName || r.hospital || "-";
-        const lateText = r.isLate ? `<span style="color:#e74c3c; font-size:12px; font-weight:bold;">(متأخر في: ${r.lateMonths.join('، ')})</span>` : `<span style="color:#27ae60; font-size:11px;">(ملتزم)</span>`;
-        const displayStyle = r.isLate ? 'block' : 'none'; 
+    // الدالة المسؤولة عن تحديث القائمة فوراً عند اختيار أي سنة أو فلتر
+    window.updatePrintPreview = function() {
+        const selectedYears = Array.from(document.querySelectorAll('.print-year-cb:checked')).map(cb => cb.value);
+        const onlyLate = document.getElementById('filterLateOnly')?.checked || false;
+        const typeFilter = document.getElementById('filterPrintType')?.value || 'all';
+        const listContainer = document.getElementById('printCheckboxList');
+        if (!listContainer) return;
         
-        // أضفنا data-type لمعرفة نوع كل سطر أثناء الفلترة
-        html += `
-            <div class="print-item-row" data-is-late="${r.isLate}" data-type="${r.type}" style="display: ${displayStyle}; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
-                <label style="cursor: pointer; display: flex; align-items: flex-start; gap: 8px;">
-                    <input type="checkbox" class="print-contract-cb" value="${r.id}" checked style="margin-top: 4px;">
-                    <div style="flex:1;">
-                        <div style="font-weight:bold; color:#333;">${title} <span style="font-size:10px; color:#777; font-weight:normal;">(${r.type})</span></div>
-                        <div>${lateText}</div>
-                    </div>
-                </label>
-            </div>
-        `;
-    });
+        listContainer.innerHTML = '';
+        const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+        const now = new Date(); const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    html += `</div>`;
-
-    // دالة الفلترة الشاملة داخل النافذة (متأخر + النوع)
-    window.applyPrintFilters = function() {
-        const onlyLate = document.getElementById('filterLateOnly').checked;
-        const typeFilterEl = document.getElementById('filterPrintType');
-        const typeFilter = typeFilterEl ? typeFilterEl.value : 'all';
-
-        const items = document.querySelectorAll('.print-item-row');
-        items.forEach(item => {
-            const isLate = item.getAttribute('data-is-late') === 'true';
-            const itemType = item.getAttribute('data-type');
+        rows.forEach(r => {
+            r.lateMonthsList = []; // مصفوفة لتجميع الشهور
+            const contractStartDate = new Date(r.startDate); contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
             
-            const matchLate = onlyLate ? isLate : true;
-            const matchType = typeFilter === 'all' ? true : (itemType === typeFilter);
+            if (r.months && monthNames) {
+                monthNames.forEach((mName, idx) => {
+                    const [mAr, mYear] = mName.split(' '); 
+                    if (selectedYears.includes(mYear)) { // إذا كانت السنة ضمن المحدد
+                        const md = r.months[idx] || {financeStatus: 'late'};
+                        const mIdx = arMonths.indexOf(mAr);
+                        const cellDate = new Date(parseInt(mYear), mIdx, 1);
+                        
+                        if (cellDate >= contractStartDate && cellDate < currentMonthStart && md.financeStatus === 'late') {
+                            r.lateMonthsList.push(mName); // حفظ (مثال: يناير 2024)
+                        }
+                    }
+                });
+            }
+            
+            r.isLate = r.lateMonthsList.length > 0;
+            const matchLate = onlyLate ? r.isLate : true;
+            const matchType = typeFilter === 'all' ? true : (r.type === typeFilter);
 
-            // إظهار السطر فقط إذا طابق الشرطين معاً
-            item.style.display = (matchLate && matchType) ? 'block' : 'none';
+            if (matchLate && matchType) {
+                const title = r.contractName || r.hospital || "-";
+                const lateText = r.isLate 
+                    ? `<span style="color:#e74c3c; font-size:12px; font-weight:bold;">(متأخر في: ${r.lateMonthsList.join('، ')})</span>` 
+                    : `<span style="color:#27ae60; font-size:11px;">(ملتزم)</span>`;
+                
+                listContainer.innerHTML += `
+                    <div class="print-item-row" style="margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+                        <label style="cursor: pointer; display: flex; align-items: flex-start; gap: 8px;">
+                            <!-- نخزن النص المجمع في الزر نفسه ليرسله للطباعة -->
+                            <input type="checkbox" class="print-contract-cb" value="${r.id}" data-latetext="${r.lateMonthsList.join('، ')}" checked style="margin-top: 4px;">
+                            <div style="flex:1;">
+                                <div style="font-weight:bold; color:#333;">${title} <span style="font-size:10px; color:#777; font-weight:normal;">(${r.type})</span></div>
+                                <div>${lateText}</div>
+                            </div>
+                        </label>
+                    </div>
+                `;
+            }
         });
+        if (listContainer.innerHTML === '') listContainer.innerHTML = '<div style="text-align:center; color:#777; padding:10px;">لا توجد بيانات مطابقة لهذه الفلاتر</div>';
     };
 
-    // إظهار النافذة
     const { isConfirmed } = await Swal.fire({
-        title: 'إعدادات الطباعة المخصصة',
+        title: 'التقرير التجميعي الشامل',
         html: html,
-        width: '600px',
+        width: '700px',
+        didOpen: () => { window.updatePrintPreview(); },
         showCancelButton: true,
-        confirmButtonText: '🖨️ طباعة التقرير',
+        confirmButtonText: '🖨️ طباعة التقرير التجميعي',
         cancelButtonText: 'إلغاء'
     });
 
     if (isConfirmed) {
-        // يتم إرسال العناصر الظاهرة للمستخدم فقط
-        const selectedIds = Array.from(document.querySelectorAll('.print-contract-cb:checked'))
-                                 .filter(cb => cb.closest('.print-item-row').style.display !== 'none')
-                                 .map(cb => cb.value);
+        // جمع البيانات وتجهيزها للإرسال
+        const selectedData = Array.from(document.querySelectorAll('.print-contract-cb:checked'))
+            .map(cb => ({ id: cb.value, lateText: cb.getAttribute('data-latetext') }));
                                  
-        if (selectedIds.length === 0) {
-            Swal.fire('تنبيه', 'لم تقم بتحديد أي موقع للطباعة!', 'warning');
-            return;
-        }
+        if (selectedData.length === 0) { Swal.fire('تنبيه', 'لم تقم بتحديد أي موقع!', 'warning'); return; }
         
-        const isLateOnly = document.getElementById('filterLateOnly').checked;
+        const selectedYears = Array.from(document.querySelectorAll('.print-year-cb:checked')).map(cb => cb.value);
         
-        // إرسال البيانات المحددة لملف الطباعة
         import('./print.js').then(module => {
-            module.openPrintPage(appData, window.selectedYear, window.userRole, selectedIds, isLateOnly);
+            module.printSummaryReport(appData, window.userRole, selectedData, selectedYears);
         });
     }
 };
