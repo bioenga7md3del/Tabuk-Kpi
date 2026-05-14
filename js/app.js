@@ -509,7 +509,7 @@ window.openCustomPrint = async function() {
     const { contracts, monthNames } = appData;
     let rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
 
-    // تصفية حسب الصلاحية
+    // تصفية حسب الصلاحية الأساسية
     if (window.userRole === 'medical') rows = rows.filter(r => r.type === 'طبي');
     if (window.userRole === 'non_medical') rows = rows.filter(r => r.type === 'غير طبي');
     
@@ -519,7 +519,7 @@ window.openCustomPrint = async function() {
     const now = new Date(); 
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // حساب التأخير والأشهر لكل مستشفى
+    // حساب التأخير
     rows.forEach(r => {
         r.isLate = false;
         r.lateMonths = [];
@@ -542,13 +542,26 @@ window.openCustomPrint = async function() {
         }
     });
 
+    // إنشاء حقل اختيار نوع العقد (يظهر فقط لمن لديه صلاحية الرؤية الشاملة)
+    let typeSelectHtml = '';
+    if (window.userRole === 'super' || window.userRole === 'viewer') {
+        typeSelectHtml = `
+            <select id="filterPrintType" onchange="window.applyPrintFilters()" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc; font-family: Tajawal;">
+                <option value="all">الكل (طبي وغير طبي)</option>
+                <option value="طبي">طبي فقط</option>
+                <option value="غير طبي">غير طبي فقط</option>
+            </select>
+        `;
+    }
+
     // بناء النافذة المنبثقة
     let html = `
-        <div style="text-align: right; margin-bottom: 15px; padding: 10px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px;">
-            <label style="font-weight: bold; color: #856404; cursor: pointer;">
-                <input type="checkbox" id="filterLateOnly" onchange="window.toggleLatePrintList()" checked>
-                عرض المواقع المتأخرة فقط (للطباعة)
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px;">
+            <label style="font-weight: bold; color: #e74c3c; cursor: pointer;">
+                <input type="checkbox" id="filterLateOnly" onchange="window.applyPrintFilters()" checked>
+                عرض المتأخر فقط
             </label>
+            ${typeSelectHtml}
         </div>
         <div id="printCheckboxList" style="max-height: 300px; overflow-y: auto; text-align: right; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fff;">
     `;
@@ -558,8 +571,9 @@ window.openCustomPrint = async function() {
         const lateText = r.isLate ? `<span style="color:#e74c3c; font-size:12px; font-weight:bold;">(متأخر في: ${r.lateMonths.join('، ')})</span>` : `<span style="color:#27ae60; font-size:11px;">(ملتزم)</span>`;
         const displayStyle = r.isLate ? 'block' : 'none'; 
         
+        // أضفنا data-type لمعرفة نوع كل سطر أثناء الفلترة
         html += `
-            <div class="print-item-row" data-is-late="${r.isLate}" style="display: ${displayStyle}; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+            <div class="print-item-row" data-is-late="${r.isLate}" data-type="${r.type}" style="display: ${displayStyle}; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
                 <label style="cursor: pointer; display: flex; align-items: flex-start; gap: 8px;">
                     <input type="checkbox" class="print-contract-cb" value="${r.id}" checked style="margin-top: 4px;">
                     <div style="flex:1;">
@@ -573,16 +587,22 @@ window.openCustomPrint = async function() {
 
     html += `</div>`;
 
-    // دالة لتشغيل وإيقاف فلتر المتأخرين داخل النافذة
-    window.toggleLatePrintList = function() {
+    // دالة الفلترة الشاملة داخل النافذة (متأخر + النوع)
+    window.applyPrintFilters = function() {
         const onlyLate = document.getElementById('filterLateOnly').checked;
+        const typeFilterEl = document.getElementById('filterPrintType');
+        const typeFilter = typeFilterEl ? typeFilterEl.value : 'all';
+
         const items = document.querySelectorAll('.print-item-row');
         items.forEach(item => {
-            if (onlyLate) {
-                item.style.display = item.getAttribute('data-is-late') === 'true' ? 'block' : 'none';
-            } else {
-                item.style.display = 'block';
-            }
+            const isLate = item.getAttribute('data-is-late') === 'true';
+            const itemType = item.getAttribute('data-type');
+            
+            const matchLate = onlyLate ? isLate : true;
+            const matchType = typeFilter === 'all' ? true : (itemType === typeFilter);
+
+            // إظهار السطر فقط إذا طابق الشرطين معاً
+            item.style.display = (matchLate && matchType) ? 'block' : 'none';
         });
     };
 
@@ -596,9 +616,8 @@ window.openCustomPrint = async function() {
         cancelButtonText: 'إلغاء'
     });
 
-    // عند ضغط طباعة
     if (isConfirmed) {
-        // جمع كل المستشفيات التي عليها علامة (صح) وظاهرة في الشاشة
+        // يتم إرسال العناصر الظاهرة للمستخدم فقط
         const selectedIds = Array.from(document.querySelectorAll('.print-contract-cb:checked'))
                                  .filter(cb => cb.closest('.print-item-row').style.display !== 'none')
                                  .map(cb => cb.value);
