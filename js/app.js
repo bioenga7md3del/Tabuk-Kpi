@@ -505,3 +505,114 @@ window.addNewMonthSafely = async function() {
         refreshView();
     }
 };
+window.openCustomPrint = async function() {
+    const { contracts, monthNames } = appData;
+    let rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
+
+    // تصفية حسب الصلاحية
+    if (window.userRole === 'medical') rows = rows.filter(r => r.type === 'طبي');
+    if (window.userRole === 'non_medical') rows = rows.filter(r => r.type === 'غير طبي');
+    
+    rows.sort((a, b) => (a.contractName||a.hospital||"").localeCompare(b.contractName||b.hospital||"", 'ar'));
+
+    const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    const now = new Date(); 
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // حساب التأخير والأشهر لكل مستشفى
+    rows.forEach(r => {
+        r.isLate = false;
+        r.lateMonths = [];
+        const contractStartDate = new Date(r.startDate); contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
+        
+        if (r.months && monthNames) {
+            monthNames.forEach((mName, idx) => {
+                if (mName.includes(window.selectedYear)) {
+                    const md = r.months[idx] || {financeStatus: 'late'};
+                    const [mAr, mYear] = mName.split(' '); 
+                    const mIdx = arMonths.indexOf(mAr);
+                    const cellDate = new Date(parseInt(mYear), mIdx, 1);
+                    
+                    if (cellDate >= contractStartDate && cellDate < currentMonthStart && md.financeStatus === 'late') {
+                        r.isLate = true;
+                        r.lateMonths.push(mAr);
+                    }
+                }
+            });
+        }
+    });
+
+    // بناء النافذة المنبثقة
+    let html = `
+        <div style="text-align: right; margin-bottom: 15px; padding: 10px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px;">
+            <label style="font-weight: bold; color: #856404; cursor: pointer;">
+                <input type="checkbox" id="filterLateOnly" onchange="window.toggleLatePrintList()" checked>
+                عرض المواقع المتأخرة فقط (للطباعة)
+            </label>
+        </div>
+        <div id="printCheckboxList" style="max-height: 300px; overflow-y: auto; text-align: right; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fff;">
+    `;
+
+    rows.forEach(r => {
+        const title = r.contractName || r.hospital || "-";
+        const lateText = r.isLate ? `<span style="color:#e74c3c; font-size:12px; font-weight:bold;">(متأخر في: ${r.lateMonths.join('، ')})</span>` : `<span style="color:#27ae60; font-size:11px;">(ملتزم)</span>`;
+        const displayStyle = r.isLate ? 'block' : 'none'; 
+        
+        html += `
+            <div class="print-item-row" data-is-late="${r.isLate}" style="display: ${displayStyle}; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
+                <label style="cursor: pointer; display: flex; align-items: flex-start; gap: 8px;">
+                    <input type="checkbox" class="print-contract-cb" value="${r.id}" checked style="margin-top: 4px;">
+                    <div style="flex:1;">
+                        <div style="font-weight:bold; color:#333;">${title} <span style="font-size:10px; color:#777; font-weight:normal;">(${r.type})</span></div>
+                        <div>${lateText}</div>
+                    </div>
+                </label>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+
+    // دالة لتشغيل وإيقاف فلتر المتأخرين داخل النافذة
+    window.toggleLatePrintList = function() {
+        const onlyLate = document.getElementById('filterLateOnly').checked;
+        const items = document.querySelectorAll('.print-item-row');
+        items.forEach(item => {
+            if (onlyLate) {
+                item.style.display = item.getAttribute('data-is-late') === 'true' ? 'block' : 'none';
+            } else {
+                item.style.display = 'block';
+            }
+        });
+    };
+
+    // إظهار النافذة
+    const { isConfirmed } = await Swal.fire({
+        title: 'إعدادات الطباعة المخصصة',
+        html: html,
+        width: '600px',
+        showCancelButton: true,
+        confirmButtonText: '🖨️ طباعة التقرير',
+        cancelButtonText: 'إلغاء'
+    });
+
+    // عند ضغط طباعة
+    if (isConfirmed) {
+        // جمع كل المستشفيات التي عليها علامة (صح) وظاهرة في الشاشة
+        const selectedIds = Array.from(document.querySelectorAll('.print-contract-cb:checked'))
+                                 .filter(cb => cb.closest('.print-item-row').style.display !== 'none')
+                                 .map(cb => cb.value);
+                                 
+        if (selectedIds.length === 0) {
+            Swal.fire('تنبيه', 'لم تقم بتحديد أي موقع للطباعة!', 'warning');
+            return;
+        }
+        
+        const isLateOnly = document.getElementById('filterLateOnly').checked;
+        
+        // إرسال البيانات المحددة لملف الطباعة
+        import('./print.js').then(module => {
+            module.openPrintPage(appData, window.selectedYear, window.userRole, selectedIds, isLateOnly);
+        });
+    }
+};
