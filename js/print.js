@@ -130,7 +130,7 @@ export function openPrintPage(appData, selectedYear, userRole, selectedIds = nul
         </table>
 
         <div class="fixed-footer">
-            تم استخراج هذا التقرير آلياً من نظام متابعة العقود والمستخلصات - تجمع تبوك الصحي
+            تم استخراج هذا التقرير آلياً من نظام متابعة العقود والمستخلصات - إدارة الصيانة - تجمع تبوك الصحي
         </div>
 
         <script>window.onload = function() { setTimeout(() => window.print(), 500); }</script>
@@ -280,7 +280,7 @@ export function printSummaryReport(appData, userRole, selectedData, selectedYear
             <div class="header-content">
                 <div class="header-right">
                     <h1>تجمع تبوك الصحي</h1>
-                    <p>الإدارة التنفيذية للشئون المالية - إدارة العقود</p>
+                    <p>  إدارة الصيانة - تجمع تبوك الصحي </p>
                 </div>
                 <div style="text-align:center;">
                     <h2 style="color: #c0392b; margin-bottom:5px;">تقرير المتأخرات التجميعي 🔴</h2>
