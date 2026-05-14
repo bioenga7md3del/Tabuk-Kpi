@@ -130,7 +130,7 @@ export function openPrintPage(appData, selectedYear, userRole, selectedIds = nul
         </table>
 
         <div class="fixed-footer">
-            تم استخراج هذا التقرير آلياً من نظام إدارة الصيانة - تجمع تبوك الصحي
+            تم استخراج هذا التقرير آلياً من نظام متابعة العقود و المستخلصات بإدارة الصيانة - تجمع تبوك الصحي
         </div>
 
         <script>window.onload = function() { setTimeout(() => window.print(), 500); }</script>
@@ -314,7 +314,7 @@ export function printSummaryReport(appData, userRole, selectedData, selectedYear
         </table>
 
         <div class="fixed-footer">
-            تم استخراج هذا التقرير آلياً من نظام متابعة العقود والمستخلصات - تجمع تبوك الصحي
+            تم استخراج هذا التقرير آلياً من نظام متابعة العقود و المستخلصات بإدارة الصيانة - تجمع تبوك الصحي
         </div>
 
         <script>window.onload = function() { setTimeout(() => window.print(), 500); }</script>
