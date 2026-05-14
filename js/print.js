@@ -211,3 +211,117 @@ function getRoleName(role) {
     if (role === 'non_medical') return 'مشرف غير طبي';
     return 'مطلع';
 }
+// js/print.js (في نهاية الملف)
+
+export function printSummaryReport(appData, userRole, selectedData, selectedYears) {
+    const { contracts, contractors } = appData;
+
+    // استخراج بيانات المستشفيات المحددة فقط
+    const rows = selectedData.map(sd => {
+        const row = contracts[sd.id];
+        return { ...row, lateText: sd.lateText };
+    });
+
+    const totalContracts = rows.length;
+    let yearsText = selectedYears.length > 0 ? selectedYears.join(' و ') : 'غير محدد';
+
+    // بناء صفوف الجدول بـ 4 أعمدة فقط
+    let tableRowsHtml = rows.map(r => {
+        const cName = contractors[r.contractorId]?.name || "-";
+        const cTitle = r.contractName || r.hospital || "-";
+        const lateContent = r.lateText ? r.lateText : 'ملتزم ✅';
+        
+        return `
+            <tr>
+                <td style="text-align:right; font-weight:bold;">${cTitle}</td>
+                <td>${cName}</td>
+                <td>${r.type || '-'}</td>
+                <td style="color:#c0392b; text-align:right; padding-right:10px; line-height:1.6;">${lateContent}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const printWindow = window.open('', '_blank');
+    
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head>
+        <title>تقرير المتأخرات التجميعي</title>
+        <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
+        <style>
+            /* التعديل هنا: Paper Size is Portrait (طولية) لأن الأعمدة قليلة */
+            @page { size: A4 portrait; margin: 15mm; } 
+            body { font-family: 'Tajawal', sans-serif; -webkit-print-color-adjust: exact; margin: 0; }
+            table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 15px; }
+            thead { display: table-header-group; } 
+            tfoot { display: table-footer-group; } 
+            tr { page-break-inside: avoid; break-inside: avoid; } 
+            
+            /* ألوان وتنسيقات مريحة للعين */
+            th { background-color: #0056b3 !important; color: white !important; padding: 12px; border: 1px solid #000; font-size: 14px;}
+            td { border: 1px solid #000; padding: 10px; text-align: center; vertical-align: top; }
+            
+            .header-container { width: 100%; margin-bottom: 20px; }
+            .header-content { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0056b3; padding-bottom: 10px; }
+            .header-right { text-align: right; }
+            .header-left { text-align: left; }
+            .header h1 { margin: 0; color: #0056b3; font-size: 24px; }
+            .header p { margin: 5px 0 0; color: #555; font-size: 14px; }
+
+            .summary-box { display: flex; gap: 20px; margin-bottom: 15px; background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 5px; page-break-inside: avoid; }
+            .sum-item { font-weight: bold; font-size: 13px; }
+
+            .fixed-footer { position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; font-size: 11px; color: #777; background: white; border-top: 1px solid #ccc; padding-top: 5px; height: 30px; }
+        </style>
+    </head>
+    <body>
+        <div class="header-container">
+            <div class="header-content">
+                <div class="header-right">
+                    <h1>تجمع تبوك الصحي</h1>
+                    <p>الإدارة التنفيذية للشئون المالية - إدارة العقود</p>
+                </div>
+                <div style="text-align:center;">
+                    <h2 style="color: #c0392b; margin-bottom:5px;">تقرير المتأخرات التجميعي 🔴</h2>
+                    <p>السنوات المفحوصة: <b>${yearsText}</b></p>
+                </div>
+                <div class="header-left">
+                    <img src="TabukCluster.jpeg" style="height: 60px;">
+                    <p>تاريخ: ${new Date().toLocaleDateString('ar-SA')}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="summary-box">
+            <div class="sum-item">عدد المواقع المطبوعة: ${totalContracts}</div>
+            <div class="sum-item">الجهة المصدرة: إدارة المتابعة (KPI)</div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th width="25%">اسم العقد / المستشفى</th>
+                    <th width="20%">المقاول</th>
+                    <th width="10%">النوع</th>
+                    <th width="45%">الشهور المتأخرة إجمالاً</th>
+                </tr>
+            </thead>
+            <tfoot><tr><td colspan="4" style="border:none; height: 40px;"></td></tr></tfoot>
+            <tbody>
+                ${tableRowsHtml}
+            </tbody>
+        </table>
+
+        <div class="fixed-footer">
+            تم استخراج هذا التقرير آلياً من نظام متابعة العقود والمستخلصات - تجمع تبوك الصحي
+        </div>
+
+        <script>window.onload = function() { setTimeout(() => window.print(), 500); }</script>
+    </body>
+    </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+}
