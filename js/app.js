@@ -508,7 +508,6 @@ window.addNewMonthSafely = async function() {
 
 
 ////طباعة مخصصة
-
 window.openCustomPrint = async function() {
     const { contracts, monthNames } = appData;
     let rows = Object.entries(contracts).map(([id, val]) => ({...val, id}));
@@ -519,7 +518,7 @@ window.openCustomPrint = async function() {
 
     const availableYears = [...new Set((monthNames || []).map(m => m.split(' ')[1]))].sort();
     
-    // بناء النافذة المنبثقة مع إضافة خيارات التمديد والشراء المباشر
+    // بناء النافذة المنبثقة مع إضافة خيار الفترة الختامية
     let html = `
         <div style="background: #f8f9fa; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px; text-align:right;">
             <div style="font-weight:bold; margin-bottom: 8px; color:#0056b3;">1. اختر السنوات المطلوب فحصها:</div>
@@ -534,12 +533,15 @@ window.openCustomPrint = async function() {
 
         <div style="background: #e9ecef; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; text-align:right;">
             <div style="font-weight:bold; margin-bottom: 8px; color:#333;">2. إعدادات فترات التأخير:</div>
-            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                <label style="cursor: pointer; color: #2c3e50;">
-                    <input type="checkbox" id="includeExtension" checked onchange="window.updatePrintPreview()"> تضمين تأخيرات التمديد (10%)
+            <div style="display: flex; gap: 15px; flex-wrap: wrap; font-size: 13px;">
+                <label style="cursor: pointer; color: #2c3e50; font-weight: bold;">
+                    <input type="checkbox" id="includeClosing" checked onchange="window.updatePrintPreview()"> تأخيرات الفترة الختامية
                 </label>
-                <label style="cursor: pointer; color: #2c3e50;">
-                    <input type="checkbox" id="includeDirect" checked onchange="window.updatePrintPreview()"> تضمين تأخيرات الشراء المباشر
+                <label style="cursor: pointer; color: #2c3e50; font-weight: bold;">
+                    <input type="checkbox" id="includeExtension" checked onchange="window.updatePrintPreview()"> تأخيرات التمديد (10%)
+                </label>
+                <label style="cursor: pointer; color: #2c3e50; font-weight: bold;">
+                    <input type="checkbox" id="includeDirect" checked onchange="window.updatePrintPreview()"> تأخيرات الشراء المباشر
                 </label>
             </div>
         </div>
@@ -564,6 +566,9 @@ window.openCustomPrint = async function() {
         const selectedYears = Array.from(document.querySelectorAll('.print-year-cb:checked')).map(cb => cb.value);
         const onlyLate = document.getElementById('filterLateOnly')?.checked || false;
         const typeFilter = document.getElementById('filterPrintType')?.value || 'all';
+        
+        // جلب قيم الفلاتر الجديدة
+        const includeClosing = document.getElementById('includeClosing')?.checked || false;
         const includeExtension = document.getElementById('includeExtension')?.checked || false;
         const includeDirect = document.getElementById('includeDirect')?.checked || false;
 
@@ -578,6 +583,9 @@ window.openCustomPrint = async function() {
             r.lateMonthsList = []; 
             const contractStartDate = new Date(r.startDate); contractStartDate.setDate(1); contractStartDate.setHours(0,0,0,0);
             const contractEndDate = new Date(r.endDate); contractEndDate.setDate(1); contractEndDate.setHours(0,0,0,0);
+            
+            // حساب بداية الفترة الختامية ونهاية التمديد
+            const closingPeriodStart = new Date(contractEndDate); closingPeriodStart.setMonth(closingPeriodStart.getMonth() - 5);
             const extensionEndDate = new Date(contractEndDate); extensionEndDate.setMonth(extensionEndDate.getMonth() + 6);
             
             if (r.months && monthNames) {
@@ -590,19 +598,23 @@ window.openCustomPrint = async function() {
                         
                         if (cellDate >= contractStartDate && cellDate < currentMonthStart && md.financeStatus === 'late') {
                             
-                            // --- تحديد فترة الشهر وهل نضمه أم لا ---
                             let periodTag = "";
                             let shouldInclude = true;
 
-                            if (cellDate <= contractEndDate) {
-                                // 1. فترة أساسية - دائما يتم طباعتها
+                            // --- منطق الفترات الجديد ---
+                            if (cellDate <= closingPeriodStart) {
+                                // 1. فترة أساسية عادية (قبل الـ 5 شهور الأخيرة)
                                 periodTag = "";
+                            } else if (cellDate > closingPeriodStart && cellDate <= contractEndDate) {
+                                // 2. فترة ختامية (آخر 5 شهور)
+                                if (!includeClosing) shouldInclude = false;
+                                periodTag = " (ختامي)";
                             } else if (cellDate > contractEndDate && cellDate <= extensionEndDate) {
-                                // 2. فترة تمديد
+                                // 3. فترة تمديد
                                 if (!includeExtension) shouldInclude = false;
                                 periodTag = " (تمديد)";
                             } else if (cellDate > extensionEndDate) {
-                                // 3. فترة شراء مباشر
+                                // 4. فترة شراء مباشر
                                 if (!includeDirect) shouldInclude = false;
                                 periodTag = " (مباشر)";
                             }
