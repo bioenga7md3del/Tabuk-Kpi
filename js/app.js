@@ -96,6 +96,7 @@ window.refreshView = function() {
     // تمرير userRole لـ renderTable للفلترة
     const filteredRows = UI.renderTable(appData, window.userRole, canEdit, window.selectedYear);
     UI.updateStats(filteredRows, appData, window.selectedYear);
+    UI.updateStageSummary(filteredRows, appData, window.selectedYear);
     UI.renderYearTabs(appData.contracts, window.selectedYear);
     
     // تحديث الكروت إذا كان التاب نشطاً
@@ -121,53 +122,127 @@ function canEdit(role, contractType) {
 }
 
 // --- 3. Popup Handling ---
+function roleLabel() {
+    return { super: 'سوبر أدمن', medical: 'مشرف طبي', non_medical: 'مشرف غير طبي', viewer: 'مطلع' }[window.userRole] || '-';
+}
+
+window.setStageFilter = function(stage) {
+    const sel = document.getElementById('stageFilter'); if (!sel) return;
+    sel.value = (sel.value === stage) ? 'all' : stage;
+    refreshView();
+};
+
+// إزالة الحقول الفارغة (Firebase لا يحتاجها) وإرجاع كائن نظيف
+function cleanRecord(obj) {
+    const out = {};
+    Object.entries(obj).forEach(([k, v]) => { if (v !== '' && v !== undefined && v !== null) out[k] = v; });
+    return out;
+}
+
+// هل رقم المطالبة مستخدم في خلية أخرى؟
+function findDuplicateClaim(claimNum, exceptContractId, exceptIndex) {
+    for (const [cid, c] of Object.entries(appData.contracts)) {
+        const months = c.months || [];
+        for (let i = 0; i < months.length; i++) {
+            const m = months[i];
+            if (!m || !m.claimNum) continue;
+            if (cid === exceptContractId && i === exceptIndex) continue;
+            if (String(m.claimNum).trim() === claimNum) return `${c.contractName || c.hospital || cid} - ${appData.monthNames[i] || i}`;
+        }
+    }
+    return null;
+}
+
+// --- 3. Popup Handling (تتبع المستخلص) ---
 window.handleKpiCell = async function(contractId, monthIndex) {
-    // فحص أمان إضافي
     const row = appData.contracts[contractId];
-    if (!canEdit(window.userRole, row.type)) return; 
+    if (!row || !canEdit(window.userRole, row.type)) return;
 
-    const currentData = (row.months && row.months[monthIndex]) ? row.months[monthIndex] : {};
-    
+    const cur = (row.months && row.months[monthIndex]) ? row.months[monthIndex] : {};
+    const curStage = UI.getStage(cur);
+    const E = UI.esc;
+    const monthName = appData.monthNames[monthIndex] || '';
+
+    const stageOptions = `<option value="" ${curStage === '' ? 'selected' : ''}>✘ لم يُرفع بعد</option>` +
+        Object.entries(UI.STAGES).map(([k, S]) => `<option value="${k}" ${curStage === k ? 'selected' : ''}>${S.icon} ${S.label}</option>`).join('');
+
+    // سجل الحركة (آخر 6)
+    const hist = Object.values(cur.history || {}).sort((x, y) => (y.at || 0) - (x.at || 0)).slice(0, 6);
+    const stageName = k => k ? UI.STAGES[k].label : 'لم يُرفع';
+    const histHtml = hist.length ? `<div class="popup-full-width claim-history"><label class="popup-label">📜 سجل الحركة</label>${hist.map(h =>
+        `<div>${new Date(h.at).toLocaleString('ar-SA', { dateStyle: 'short', timeStyle: 'short' })} — ${E(stageName(h.from))} ← <b>${E(stageName(h.to))}</b> — ${E(h.by || '-')}${h.note ? ' — ' + E(h.note) : ''}</div>`).join('')}</div>` : '';
+
     const htmlForm = `
-        <div class="popup-form-container">
-            <div>
-                <label class="popup-label">الحالة</label>
-                <select id="swalStatus" class="swal2-select">
-                    <option value="late" ${currentData.financeStatus==='late'?'selected':''}>متأخر ❌</option>
-                    <option value="sent" ${currentData.financeStatus==='sent'?'selected':''}>تم الرفع ✅</option>
-                    <option value="returned" ${currentData.financeStatus==='returned'?'selected':''}>إعادة ⚠️</option>
-                </select>
-            </div>
-            <div><label class="popup-label">رقم المطالبة</label><input id="swalClaim" class="swal2-input" value="${currentData.claimNum||''}"></div>
-            <div><label class="popup-label">رقم الخطاب</label><input id="swalLetter" class="swal2-input" value="${currentData.letterNum||''}"></div>
-            <div><label class="popup-label">رابط المستند</label><input id="swalLink" class="swal2-input" value="${currentData.docLink||''}"></div>
-            <div class="popup-full-width"><label class="popup-label">ملاحظات</label><textarea id="swalReturn" class="swal2-textarea" style="height:80px">${currentData.returnNotes||''}</textarea></div>
-        </div>`;
+    <div class="popup-form-container">
+        <div class="popup-full-width"><label class="popup-label">📍 مكان المستخلص الآن</label>
+            <select id="swalStage" class="swal2-select">${stageOptions}</select></div>
+        <div><label class="popup-label">رقم المستخلص</label><input id="swalExtract" class="swal2-input" value="${E(cur.extractNo)}"></div>
+        <div><label class="popup-label">رقم الشحنة (المطالبة)</label><input id="swalClaim" class="swal2-input" value="${E(cur.claimNum)}"></div>
+        <div><label class="popup-label">رقم الفاتورة</label><input id="swalInvoice" class="swal2-input" value="${E(cur.invoiceNum || cur.invoiceNo)}"></div>
+        <div><label class="popup-label">رقم الخطاب</label><input id="swalLetter" class="swal2-input" value="${E(cur.letterNum)}"></div>
+        <div class="popup-full-width"><label class="popup-label">👤 اسم المراجع</label><input id="swalReviewer" class="swal2-input" value="${E(cur.reviewerName)}"></div>
+        <div class="popup-full-width"><label class="popup-label">رابط المستند</label><input id="swalLink" class="swal2-input" value="${E(cur.docLink)}"></div>
+        <div class="popup-full-width"><label class="popup-label">ملاحظات / سبب الإعادة</label><textarea id="swalReturn" class="swal2-textarea" style="height:70px">${E(cur.returnNotes)}</textarea></div>
+        ${histHtml}
+    </div>`;
 
-    const { value: formValues } = await Swal.fire({
-        title: `تحديث: ${row.contractName}`,
+    let dupAccepted = null;
+    const { value: f } = await Swal.fire({
+        title: `${E(row.contractName || row.hospital || '')} — ${E(monthName)}`,
         html: htmlForm,
-        width: '600px',
+        width: '620px',
         showCancelButton: true,
         confirmButtonText: 'حفظ',
+        cancelButtonText: 'إلغاء',
         preConfirm: () => {
-            return {
-                financeStatus: document.getElementById('swalStatus').value,
-                claimNum: document.getElementById('swalClaim').value,
-                letterNum: document.getElementById('swalLetter').value,
-                returnNotes: document.getElementById('swalReturn').value,
-                docLink: document.getElementById('swalLink').value
+            const v = id => document.getElementById(id).value.trim();
+            const f = { stage: v('swalStage'), extractNo: v('swalExtract'), claimNum: v('swalClaim'), invoiceNo: v('swalInvoice'),
+                        letterNum: v('swalLetter'), reviewerName: v('swalReviewer'), docLink: v('swalLink'), returnNotes: v('swalReturn') };
+            const needReviewer = ['at_maintenance', 'at_finance', 'returned', 'received'].includes(f.stage);
+            const needNumbers = ['at_finance', 'received'].includes(f.stage);
+            if (needReviewer && !f.reviewerName) { Swal.showValidationMessage('اكتب اسم المراجع'); return false; }
+            if (needNumbers && !f.extractNo) { Swal.showValidationMessage('رقم المستخلص مطلوب قبل الرفع للمالية'); return false; }
+            if (needNumbers && !f.claimNum) { Swal.showValidationMessage('رقم الشحنة (المطالبة) مطلوب قبل الرفع للمالية'); return false; }
+            if (f.stage === 'received' && !['at_finance', 'received'].includes(curStage)) { Swal.showValidationMessage('لا يمكن تسجيل الاستلام قبل الرفع للمالية'); return false; }
+            if (f.stage === 'returned' && !f.returnNotes) { Swal.showValidationMessage('اكتب سبب الإعادة في الملاحظات'); return false; }
+            if (f.docLink && !/^https?:\/\//i.test(f.docLink)) { Swal.showValidationMessage('رابط المستند يجب أن يبدأ بـ http أو https'); return false; }
+            if (f.claimNum) {
+                const dup = findDuplicateClaim(f.claimNum, contractId, monthIndex);
+                if (dup && dupAccepted !== f.claimNum) {
+                    dupAccepted = f.claimNum;
+                    Swal.showValidationMessage(`رقم المطالبة مستخدم في: ${dup} — اضغط "حفظ" مرة أخرى للتأكيد`);
+                    return false;
+                }
             }
+            return f;
         }
     });
+    if (!f) return;
 
-    if (formValues) {
-        if (!row.months) row.months = [];
-        row.months[monthIndex] = formValues;
-        await DB.saveData(`app_db_v2/contracts/${contractId}/months`, row.months);
-        refreshView();
-        UI.showToast("تم التحديث ✅");
+    const nowTs = Date.now();
+    const oldHist = Object.values(cur.history || {});
+    const newHist = (f.stage !== curStage)
+        ? [...oldHist, cleanRecord({ from: curStage, to: f.stage, by: roleLabel(), at: nowTs, note: f.returnNotes })]
+        : oldHist;
+
+    const base = cleanRecord({ ...f, financeStatus: UI.deriveFinanceStatus(f.stage), updatedBy: roleLabel() });
+    const localRec = { ...base, updatedAt: nowTs, history: newHist };
+    // للحفظ: الأوقات من ساعة السيرفر (آخر عنصر في السجل فقط جديد)
+    const toSave = { ...base, updatedAt: DB.serverTs(),
+        history: newHist.map((h, i) => (i === newHist.length - 1 && f.stage !== curStage) ? { ...h, at: DB.serverTs() } : h) };
+    if (!toSave.history.length) delete toSave.history;
+    if (!localRec.history.length) delete localRec.history;
+
+    try {
+        await DB.saveData(`app_db_v2/contracts/${contractId}/months/${monthIndex}`, toSave);
+    } catch (e) {
+        Swal.fire('تعذر الحفظ', 'حدث خطأ أثناء الحفظ، تأكد من الاتصال وحاول مرة أخرى', 'error');
+        return;
     }
+    if (!row.months) row.months = [];
+    row.months[monthIndex] = localRec;
+    refreshView();
+    UI.showToast("تم التحديث ✅");
 };
 
 window.editNote = async function(id) {
@@ -194,7 +269,7 @@ window.prepareAddContract = async function() {
     if (window.userRole === 'viewer') return;
 
     let contractorOptions = '';
-    Object.entries(appData.contractors).forEach(([id, c]) => { contractorOptions += `<option value="${id}">${c.name}</option>`; });
+    Object.entries(appData.contractors).forEach(([id, c]) => { contractorOptions += `<option value="${id}">${UI.esc(c.name)}</option>`; });
     if (contractorOptions === '') { Swal.fire('تنبيه', 'أضف مقاولين أولاً', 'warning'); return; }
 
     // تحديد نوع العقد إجبارياً حسب المشرف
@@ -261,13 +336,13 @@ window.prepareEditContract = async function(id) {
 
     let contractorOptions = '';
     Object.entries(appData.contractors).forEach(([cid, cont]) => {
-        contractorOptions += `<option value="${cid}" ${cid===c.contractorId?'selected':''}>${cont.name}</option>`;
+        contractorOptions += `<option value="${cid}" ${cid===c.contractorId?'selected':''}>${UI.esc(cont.name)}</option>`;
     });
 
     const htmlForm = `
         <div class="popup-form-container">
-            <div class="popup-full-width"><label class="popup-label">اسم العقد</label><input id="ecName" class="swal2-input" value="${c.contractName||c.hospital||''}"></div>
-            <div><label class="popup-label">رقم العقد</label><input id="ecNum" class="swal2-input" value="${c.contractNumber||''}"></div>
+            <div class="popup-full-width"><label class="popup-label">اسم العقد</label><input id="ecName" class="swal2-input" value="${UI.esc(c.contractName||c.hospital||'')}"></div>
+            <div><label class="popup-label">رقم العقد</label><input id="ecNum" class="swal2-input" value="${UI.esc(c.contractNumber||'')}"></div>
             <div><label class="popup-label">القيمة</label><input id="ecVal" type="number" class="swal2-input" value="${c.value||''}"></div>
             <div><label class="popup-label">البداية</label><input id="ecStart" type="date" class="swal2-input" value="${c.startDate||''}"></div>
             <div><label class="popup-label">النهاية</label><input id="ecEnd" type="date" class="swal2-input" value="${c.endDate||''}"></div>

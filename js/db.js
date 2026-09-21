@@ -2,7 +2,7 @@
 
 // 1. استدعاء المكتبات
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getDatabase, ref, set, get, update, remove, child } 
+import { getDatabase, ref, set, get, update, remove, child, serverTimestamp } 
     from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
 // 2. إعدادات مشروعك (كما هي من ملفك)
@@ -94,4 +94,10 @@ export async function getPasswords() {
 
 export async function savePasswords(passwords) {
     return set(ref(db, 'app_settings/passwords'), passwords);
+}
+
+
+// 7. ختم زمني من السيرفر (يُستخدم في تسجيل وقت تحديث المستخلص)
+export function serverTs() {
+    return serverTimestamp();
 }
