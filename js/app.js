@@ -46,9 +46,49 @@ async function startSession(role) {
     document.getElementById('dashboard').style.display = 'block';
     updateUIForRole();
     setLoading(true);
-    try { await loadData(); } finally { setLoading(false); }
+    try { await loadData(); await ensureCurrentMonth(); } finally { setLoading(false); }
     refreshView();
     if (window.userRole === 'super') checkAutoBackup();
+}
+
+
+// --- إضافة الشهر الجاري تلقائياً (لكل من يملك صلاحية تعديل؛ المطلع لا يكتب) ---
+const AR_MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+function parseMonthName(n) {
+    const [m, y] = String(n).trim().split(/\s+/);
+    const mi = AR_MONTHS.indexOf(m), yr = parseInt(y, 10);
+    return (mi < 0 || !yr) ? null : yr * 12 + mi;
+}
+async function ensureCurrentMonth() {
+    if (window.userRole === 'viewer') return;
+    try {
+        const names = appData.monthNames || [];
+        if (!names.length) return;
+        const now = new Date(); const cur = now.getFullYear() * 12 + now.getMonth();
+        const nameOf = k => `${AR_MONTHS[k % 12]} ${Math.floor(k / 12)}`;
+        if (names.includes(nameOf(cur))) return;
+        const keys = names.map(parseMonthName).filter(k => k !== null);
+        if (!keys.length) return;
+        const newest = Math.max(...keys);
+        if (newest >= cur) return;
+        // قراءة حديثة قبل الكتابة لتفادي التكرار لو مستخدم آخر أضاف الشهر للتو
+        const fresh = await DB.getData('app_db_v2');
+        const fNames = (fresh && fresh.monthNames) ? fresh.monthNames.slice() : [];
+        if (!fresh || fNames.includes(nameOf(cur))) { appData = fresh || appData; return; }
+        const toAdd = [];
+        for (let k = newest + 1; k <= cur && toAdd.length < 24; k++) toAdd.push(nameOf(k));
+        if (!toAdd.length) return;
+        const newNames = toAdd.slice().reverse().concat(fNames); // الأحدث أولاً
+        const updates = { 'monthNames': newNames };
+        Object.entries(fresh.contracts || {}).forEach(([id, c]) => {
+            const months = (c.months || []).map(m => m || { financeStatus: 'late' });
+            toAdd.forEach(() => months.unshift({ financeStatus: 'late' }));
+            updates[`contracts/${id}/months`] = months;
+        });
+        await DB.updateData('app_db_v2', updates);
+        appData = await DB.getData('app_db_v2') || appData;
+        UI.showToast('تمت إضافة الشهر الجاري: ' + nameOf(cur));
+    } catch (e) { console.error('ensureCurrentMonth', e); }
 }
 
 function setLoading(on) { const o = document.getElementById('loadingOverlay'); if (o) o.style.display = on ? 'flex' : 'none'; }
