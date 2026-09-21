@@ -1,45 +1,16 @@
 // js/ui.js
 
-// --- 0. Styles Injection ---
+// --- 0. Print styles (بقية التنسيقات في style.css) ---
 const style = document.createElement('style');
 style.innerHTML = `
-    .badge-purple { background-color: #9b59b6; color: white; }
-    .badge-dark { background-color: #34495e; color: white; }
-    #kpi-legend { display: flex; flex-wrap: wrap; gap: 20px; padding: 15px; background: #fff; border: 1px solid #eee; margin-top: 15px; margin-bottom: 30px; font-size: 13px; justify-content: center; border-radius: 8px; }
-    .legend-item { display: flex; align-items: center; gap: 8px; font-weight: bold; color: #555; }
-    .legend-box { width: 18px; height: 18px; border: 1px solid #ddd; border-radius: 4px; }
-    .notif-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 12px; color: #333; cursor: pointer; text-align: right;}
-    .notif-item:hover { background: #f9f9f9; }
-    .notif-urgent { border-right: 3px solid #e74c3c; } 
-    .notif-warning { border-right: 3px solid #f39c12; }
-    
-    /* ستايل التلميح الذكي */
-    #global-tooltip {
-        position: fixed;
-        background: rgba(44, 62, 80, 0.95);
-        color: #fff;
-        padding: 10px 15px;
-        border-radius: 8px;
-        font-size: 12px;
-        z-index: 9999;
-        pointer-events: none;
-        display: none;
-        white-space: pre-line;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        text-align: right;
-        border: 1px solid rgba(255,255,255,0.1);
-        line-height: 1.6;
-    }
-
     @media print { 
         body * { visibility: hidden; } 
         #mainTable, #mainTable *, #printHeader, #printHeader * { visibility: visible; } 
         #printHeader { display: block !important; position: fixed; top: 0; left: 0; width: 100%; } 
-        .table-wrapper { position: absolute; top: 120px; left: 0; width: 100%; overflow: visible !important; } 
-        .navbar, .admin-panel, .toolbar-section, .card-actions, #loginScreen, .year-tabs-container, .nav-links { display: none !important; } 
+        .table-wrapper { position: absolute; top: 120px; left: 0; width: 100%; overflow: visible !important; max-height: none !important; } 
         table { width: 100% !important; border-collapse: collapse; font-size: 10pt; } 
         th, td { border: 1px solid #000 !important; color: #000 !important; } 
-        td { -webkit-print-color-adjust: exact; } 
+        td, .pill { -webkit-print-color-adjust: exact; print-color-adjust: exact; } 
     }
 `;
 document.head.appendChild(style);
@@ -95,13 +66,26 @@ function getContractStatus(start, end) {
     return { text: "شراء مباشر", badge: "badge-dark" };
 }
 
+// --- أيقونات (SVG) ---
+const ICONS = {
+    site: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+    maint: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+    check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+    returned: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
+    package: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+    x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    dash: '<line x1="6" y1="12" x2="18" y2="12"/>'
+};
+export function svg(name) { return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`; }
+
 // --- مراحل المستخلص: مكانه الآن ---
 export const STAGES = {
-    at_site:        { label: 'عند الموقع',        icon: '🏗️', cls: 'status-site',  color: '#e67e22' },
-    at_maintenance: { label: 'في إدارة الصيانة',  icon: '🛠️', cls: 'status-maint', color: '#2980b9' },
-    at_finance:     { label: 'مرفوع للمالية',     icon: '✅', cls: 'status-ok',    color: '#27ae60' },
-    returned:       { label: 'مرتجع',             icon: '⚠️', cls: 'status-returned', color: '#f39c12' },
-    received:       { label: 'تم استلام الشحنة',  icon: '📦', cls: 'status-recv',  color: '#16a085' }
+    at_site:        { label: 'عند الموقع',        icon: 'site',    color: '#c2410c' },
+    at_maintenance: { label: 'في إدارة الصيانة',  icon: 'maint',   color: '#1d5fa8' },
+    at_finance:     { label: 'مرفوع للمالية',     icon: 'check',   color: '#1a7f4b' },
+    returned:       { label: 'مرتجع',             icon: 'returned', color: '#a16207' },
+    received:       { label: 'تم استلام الشحنة',  icon: 'package', color: '#0f766e' }
 };
 
 // يقرأ مرحلة الخلية، مع دعم البيانات القديمة (financeStatus فقط)
@@ -132,7 +116,7 @@ function fmtDate(ts) {
 
 function cellTip(md, stage) {
     const S = STAGES[stage];
-    const lines = [`${S.icon} ${S.label}`];
+    const lines = [S.label];
     if (md.extractNo) lines.push(`رقم المستخلص: ${md.extractNo}`);
     if (md.claimNum) lines.push(`رقم الشحنة/المطالبة: ${md.claimNum}`);
     if (md.invoiceNo) lines.push(`رقم الفاتورة: ${md.invoiceNo}`);
@@ -156,9 +140,13 @@ export function updateStageSummary(rows, appData, selectedYear) {
     const counts = {}; Object.keys(STAGES).forEach(k => counts[k] = 0);
     (rows || []).forEach(r => yearCells(r, appData.monthNames, selectedYear).forEach(m => { const st = getStage(m); if (st) counts[st]++; }));
     const active = document.getElementById('stageFilter')?.value || 'all';
-    box.innerHTML = `<span class="year-label">أين المستخلصات الآن؟</span>` + Object.entries(STAGES).map(([k, S]) =>
-        `<div class="stage-chip ${active === k ? 'active' : ''}" style="border-color:${S.color}" onclick="window.setStageFilter('${k}')">
-            <span>${S.icon} ${S.label}</span><b style="background:${S.color}">${counts[k]}</b></div>`).join('');
+    const chip = k => { const S = STAGES[k];
+        return `<div class="stage-chip ${active === k ? 'active' : ''}" onclick="window.setStageFilter('${k}')">
+            <span class="pill st-${k}">${svg(S.icon)}</span><span>${S.label}</span><b style="background:${S.color}">${counts[k]}</b></div>`; };
+    const arrow = '<span class="stage-arrow">←</span>';
+    box.innerHTML = `<span class="year-label">مسار المستخلص</span>` +
+        ['at_site', 'at_maintenance', 'at_finance', 'received'].map(chip).join(arrow) +
+        `<span class="stage-arrow" style="margin:0 8px">|</span>` + chip('returned');
 }
 
 export function renderYearTabs(contracts, selectedYear) {
@@ -174,16 +162,24 @@ export function renderYearTabs(contracts, selectedYear) {
 function renderLegend() {
     const table = document.getElementById('mainTable'); if (!table || document.getElementById('kpi-legend')) return;
     const div = document.createElement('div'); div.id = 'kpi-legend';
-    div.innerHTML = `<div class="legend-item"><div class="legend-box" style="background:#fff"></div><span>فترة أساسية</span></div><div class="legend-item"><div class="legend-box" style="background:#ffe0b2; border-color:#e67e22"></div><span>فترة ختامية (5 شهور)</span></div><div class="legend-item"><div class="legend-box" style="background:#f3e5f5; border-color:#9b59b6"></div><span>تمديد 10%</span></div><div class="legend-item"><div class="legend-box" style="background:#e3f2fd; border-color:#34495e"></div><span>شراء مباشر</span></div><div class="legend-item"><div class="legend-box" style="background:#f9f9f9"></div><span>ما قبل العقد (مغلق)</span></div><div style="flex-basis:100%;height:0"></div>${Object.values(STAGES).map(S => `<div class="legend-item"><span style="font-size:15px">${S.icon}</span><span>${S.label}</span></div>`).join('')}<div class="legend-item"><span style="font-size:15px;color:#c0392b">✘</span><span>لم يُرفع</span></div>`;
-    table.parentNode.insertBefore(div, table.nextSibling);
+    const pill = (cls, icon, label) => `<div class="legend-item"><span class="pill ${cls}">${svg(icon)}</span><span>${label}</span></div>`;
+    div.innerHTML =
+        Object.entries(STAGES).map(([k, S]) => pill('st-' + k, S.icon, S.label)).join('') +
+        pill('st-late', 'x', 'لم يُرفع (متأخر)') + pill('st-pending', 'clock', 'الشهر الجاري') +
+        `<div style="flex-basis:100%;height:0"></div>` +
+        `<div class="legend-item"><div class="legend-box" style="background:#fff3e0;border-bottom:3px solid #f2a65a"></div><span>فترة ختامية (آخر 5 شهور)</span></div>` +
+        `<div class="legend-item"><div class="legend-box" style="background:#f6eefb;border-bottom:3px solid #a66bc4"></div><span>تمديد 10%</span></div>` +
+        `<div class="legend-item"><div class="legend-box" style="background:#eaf3fd;border-bottom:3px solid #4f7aa8"></div><span>شراء مباشر</span></div>` +
+        `<div class="legend-item"><div class="legend-box" style="background:#f8fafc;border:1px solid #e4e8ef"></div><span>قبل بداية العقد</span></div>`;
+    table.parentNode.parentNode.insertBefore(div, table.parentNode.nextSibling);
 }
 
 // --- Render Table ---
 export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     const { contracts, contractors, monthNames } = appData;
-    const sHosp = document.getElementById('searchHospital')?.value.toLowerCase() || "";
-    const sCont = document.getElementById('searchContractor')?.value.toLowerCase() || "";
-    const sClaim = document.getElementById('searchClaim')?.value.toLowerCase() || "";
+    const sHosp = document.getElementById('searchHospital')?.value.trim().toLowerCase() || "";
+    const sCont = document.getElementById('searchContractor')?.value.trim().toLowerCase() || "";
+    const sClaim = document.getElementById('searchClaim')?.value.trim().toLowerCase() || "";
     const filter = document.getElementById('typeFilter')?.value || "all";
     const sStage = document.getElementById('stageFilter')?.value || "all";
     const tbody = document.getElementById('tableBody');
@@ -192,12 +188,16 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     if (!tbody || !hRow) return;
     renderLegend();
 
+    const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    const now = new Date(); const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthName = `${arMonths[now.getMonth()]} ${now.getFullYear()}`;
+
     const filteredColumns = []; 
     if (monthNames) monthNames.forEach((mName, i) => { if (mName.includes(selectedYear)) filteredColumns.push({ name: mName, index: i }); });
 
-    let hHTML = `<th class="sticky-col-1">اسم العقد</th><th class="sticky-col-2">النوع</th><th class="sticky-col-3">المقاول</th><th style="min-width:40px">تأخير</th>`;
-    if (filteredColumns.length > 0) filteredColumns.forEach(col => hHTML += `<th style="min-width:100px">${col.name}</th>`); else hHTML += `<th>-</th>`;
-    hHTML += `<th style="min-width:150px">ملاحظات</th>`;
+    let hHTML = `<th class="sticky-col-1">اسم العقد</th><th class="sticky-col-2">النوع</th><th class="sticky-col-3">المقاول</th><th style="min-width:56px">تأخير</th>`;
+    if (filteredColumns.length > 0) filteredColumns.forEach(col => hHTML += `<th class="${col.name === currentMonthName ? 'th-current' : ''}" style="min-width:90px">${col.name}</th>`); else hHTML += `<th>-</th>`;
+    hHTML += `<th style="min-width:160px">ملاحظات</th>`;
     hRow.innerHTML = hHTML;
 
     tbody.innerHTML = '';
@@ -206,10 +206,8 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
     if (userRole === 'medical') rows = rows.filter(r => r.type === 'طبي');
     if (userRole === 'non_medical') rows = rows.filter(r => r.type === 'غير طبي');
 
-    if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="15" style="padding:20px;color:#777">لا توجد بيانات</td></tr>`; return []; }
-
-    const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
-    const now = new Date(); const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const countEl = document.getElementById('resultCount');
+    if (rows.length === 0) { tbody.innerHTML = `<tr><td colspan="15" class="empty-state">لا توجد عقود بعد</td></tr>`; if (countEl) countEl.innerText = ''; return []; }
 
     const filtered = rows.filter(r => {
         const cName = contractors[r.contractorId]?.name || "";
@@ -220,6 +218,9 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
         if (r.startDate) { const startYear = new Date(r.startDate).getFullYear(); if (startYear > selectedYear) showContract = false; }
         return (cTitle).toLowerCase().includes(sHosp) && cName.toLowerCase().includes(sCont) && (filter === 'all' || r.type === filter) && hasClaim && hasStage && showContract;
     });
+
+    if (countEl) countEl.innerText = `عرض ${filtered.length} من ${rows.length} عقد`;
+    if (filtered.length === 0) { tbody.innerHTML = `<tr><td colspan="15" class="empty-state">لا توجد نتائج مطابقة للفلاتر — جرّب "مسح الفلاتر"</td></tr>`; return []; }
 
     filtered.sort((a, b) => (a.contractName||a.hospital||"").localeCompare(b.contractName||b.hospital||"", 'ar'));
 
@@ -246,32 +247,27 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
             });
         }
         
-        const badge = late > 0 ? 'badge-red' : 'badge-green';
         const st = getContractStatus(row.startDate, row.endDate);
         const valFmt = row.value ? Number(row.value).toLocaleString() : '-';
-        
-        // --- 1. إعداد نص التلميح لنوع العقد ---
-        const contractTip = `📄 رقم العقد: ${row.contractNumber||'-'}\n💰 القيمة: ${valFmt}\n⏳ المدة: ${row.duration||'-'}\n📅 البداية: ${row.startDate||'-'}\n📅 النهاية: ${row.endDate||'-'}\n📊 الحالة: ${st.text}`;
+        const contractTip = `رقم العقد: ${row.contractNumber||'-'}\nالقيمة: ${valFmt}\nالبداية: ${row.startDate||'-'}\nالنهاية: ${row.endDate||'-'}\nالحالة: ${st.text}`;
 
         const tr = document.createElement('tr');
         tr.className = row.type === 'طبي' ? 'row-medical' : 'row-non-medical';
         
-        // تطبيق التلميح على خلية "النوع"
-        tr.innerHTML = `
-            <td class="sticky-col-1">${esc(cTitle)} <span class="badge ${st.badge}" style="font-size:9px;">${st.text}</span></td>
-            <td class="sticky-col-2" data-tip="${esc(contractTip)}" onmousemove="window.showTooltip(event, this.dataset.tip)" onmouseleave="window.hideTooltip()" style="cursor:help">
-                <span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span>
+        let html = `
+            <td class="sticky-col-1">${esc(cTitle)}<div style="margin-top:3px"><span class="badge ${st.badge}" style="font-size:9.5px;">${st.text}</span></div></td>
+            <td class="sticky-col-2" data-tip="${esc(contractTip)}" onmousemove="window.showTooltip(event, this.dataset.tip)" onmouseleave="window.hideTooltip()">
+                <span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${esc(row.type)}</span>
             </td>
             <td class="sticky-col-3">${esc(cName)}</td>
-            <td><span class="badge ${badge}">${late}</span></td>
+            <td><span class="late-badge ${late > 0 ? 'some' : 'zero'}">${late}</span></td>
         `;
 
         if (filteredColumns.length > 0) {
             filteredColumns.forEach(col => {
                 const originalIndex = col.index;
                 const md = (row.months && row.months[originalIndex]) ? row.months[originalIndex] : {financeStatus:'late'};
-                const mName = col.name;
-                const [mAr, mYear] = mName.split(' '); const mIdx = arMonths.indexOf(mAr);
+                const [mAr, mYear] = col.name.split(' '); const mIdx = arMonths.indexOf(mAr);
                 const cellDate = new Date(parseInt(mYear), mIdx, 1);
                 
                 const isBeforeContract = cellDate < contractStartDate;
@@ -280,63 +276,62 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 const isClosingPeriod = cellDate > closingPeriodStart && cellDate <= contractEndDate;
                 const isCurrentMonth = cellDate.getTime() === currentMonthStart.getTime();
 
-                let ic='✘', cl='status-late';
-                // --- 2. إعداد نص التلميح للشهر (المطالبة، الخطاب، الفترة) ---
-                let ti = 'لم يرفع'; // النص الأساسي
-
-                // تحديد نص الفترة
                 let periodLabel = "";
                 if (isDirectPurchase) periodLabel = "\n(شراء مباشر)";
                 else if (isDuringExtension) periodLabel = "\n(فترة تمديد 10%)";
                 else if (isClosingPeriod) periodLabel = "\n(فترة ختامية)";
 
                 const stage = getStage(md);
+                let pillCls = 'st-late', icon = 'x', sub = '', ti = 'لم يرفع' + periodLabel;
                 if (stage) {
-                    ic = STAGES[stage].icon; cl = STAGES[stage].cls;
+                    pillCls = 'st-' + stage; icon = STAGES[stage].icon;
+                    sub = md.claimNum || md.extractNo || '';
                     ti = cellTip(md, stage) + periodLabel;
-                }
-                else if (isBeforeContract) { 
-                    ic='-'; cl=''; ti='قبل بداية العقد (مغلق)'; 
-                }
-                else if (isCurrentMonth) { 
-                    ic='⏳'; cl=''; ti='الشهر الجاري (لم ينتهِ بعد)'; 
-                }
-                else {
-                    ti += periodLabel; // متأخر
+                } else if (isBeforeContract) {
+                    pillCls = 'st-closed'; icon = 'dash'; ti = 'قبل بداية العقد (مغلق)';
+                } else if (isCurrentMonth) {
+                    pillCls = 'st-pending'; icon = 'clock'; ti = 'الشهر الجاري (لم ينتهِ بعد)';
                 }
 
-                let highlightStyle = "";
-                if (sClaim !== "" && [md.claimNum, md.extractNo, md.reviewerName].some(v => v && v.toString().toLowerCase().includes(sClaim))) {
-                    highlightStyle = "border: 3px solid #0056b3 !important; background-color: #d6eaf8 !important; transform: scale(1.05); z-index: 100;";
-                }
-
-                if (sStage !== "all" && stage === sStage) highlightStyle += " outline: 3px solid " + STAGES[sStage].color + "; outline-offset:-3px;";
-                let bgStyle = '';
-                if (isBeforeContract) bgStyle = 'background:#f9f9f9; color:#ccc;';
-                else if (isDirectPurchase) bgStyle = 'background:#e3f2fd; border-bottom: 2px solid #34495e;';
-                else if (isDuringExtension) bgStyle = 'background:#f3e5f5; border-bottom: 2px solid #9b59b6;';
-                else if (isClosingPeriod) bgStyle = 'background:#ffe0b2; border-bottom: 2px solid #e67e22;';
+                const classes = ['cell'];
+                if (isBeforeContract) classes.push('per-before');
+                else if (isDirectPurchase) classes.push('per-direct');
+                else if (isDuringExtension) classes.push('per-ext');
+                else if (isClosingPeriod) classes.push('per-closing');
+                if (isCurrentMonth) classes.push('cur-month');
+                if (sClaim !== "" && [md.claimNum, md.extractNo, md.reviewerName].some(v => v && v.toString().toLowerCase().includes(sClaim))) classes.push('hl-claim');
 
                 const canClick = (userRole !== 'viewer') && canEditFunc(userRole, row.type) && !isBeforeContract;
+                if (canClick) classes.push('clickable');
+                const outline = (sStage !== "all" && stage === sStage) ? ` style="box-shadow: inset 0 0 0 2px ${STAGES[sStage].color}"` : '';
                 const clickAttr = canClick ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
-                
-                // تطبيق التلميح على الخلية باستخدام onmousemove
-                tr.innerHTML += `<td class="${cl}" style="cursor:${canClick?'pointer':'default'}; ${bgStyle}; ${highlightStyle}" ${clickAttr} 
-                    data-tip="${esc(ti)}" onmousemove="window.showTooltip(event, this.dataset.tip)" 
-                    onmouseleave="window.hideTooltip()">
-                    ${ic}
-                </td>`;
+
+                html += `<td class="${classes.join(' ')}"${outline} ${clickAttr} data-tip="${esc(ti)}" onmousemove="window.showTooltip(event, this.dataset.tip)" onmouseleave="window.hideTooltip()">` +
+                        `<span class="pill ${pillCls}">${svg(icon)}</span>${sub ? `<span class="cell-sub">${esc(sub)}</span>` : ''}</td>`;
             });
-        } else { tr.innerHTML += `<td>-</td>`; }
+        } else { html += `<td>-</td>`; }
         
         const canEditNote = (userRole !== 'viewer') && canEditFunc(userRole, row.type);
-        tr.innerHTML += `<td onclick="${canEditNote ? `window.editNote('${row.id}')` : ''}" style="cursor:${canEditNote?'pointer':'default'}; font-size:11px;">${esc(row.notes||'')}</td>`;
+        html += `<td onclick="${canEditNote ? `window.editNote('${row.id}')` : ''}" style="cursor:${canEditNote?'pointer':'default'}; font-size:11.5px; text-align:right; color:#4a5568;">${esc(row.notes||'')}</td>`;
+        tr.innerHTML = html;
         tbody.appendChild(tr);
     });
     return filtered;
 }
 
 // --- Render Cards ---
+// شريط تقدم مدة العقد
+function contractProgress(row) {
+    if (!row.startDate || !row.endDate) return '';
+    const s = new Date(row.startDate), e = new Date(row.endDate), t = new Date();
+    if (!(e > s)) return '';
+    const pct = Math.max(0, Math.min(100, Math.round(((t - s) / (e - s)) * 100)));
+    const days = Math.ceil((e - t) / 86400000);
+    const cls = days < 0 ? 'over' : (pct >= 85 ? 'warn' : '');
+    const cap = days < 0 ? `انتهى منذ ${Math.abs(days)} يوم` : (t < s ? 'لم يبدأ بعد' : `متبقي ${days} يوم`);
+    return `<div class="progress ${cls}"><i style="width:${pct}%"></i></div><div class="progress-cap"><span>${cap}</span><span>${pct}%</span></div>`;
+}
+
 export function renderCards(appData, type) {
     const grid = document.getElementById(type === 'contract' ? 'contractsGrid' : 'contractorsGrid'); if (!grid) return;
     grid.innerHTML = '';
@@ -370,22 +365,61 @@ export function renderCards(appData, type) {
             const st = getContractStatus(row.startDate, row.endDate);
             const valFmt = row.value ? Number(row.value).toLocaleString() : '-';
             const div = document.createElement('div'); div.className = 'data-card';
-            div.innerHTML = `<div class="card-header"><div><div class="card-title">${esc(row.contractName||row.hospital)}</div><span class="badge ${st.badge}" style="font-size:10px">${st.text}</span></div><span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span></div><div class="card-body"><div class="row"><span>المقاول:</span><b>${esc(cName)}</b></div><div class="row"><span>القيمة:</span><b>${valFmt}</b></div><div class="row"><span>النهاية:</span><b>${row.endDate||'-'}</b></div></div>
-            <div class="card-actions" style="display:${actionDisplay}"><button class="btn-primary" onclick="window.prepareEditContract('${id}')">تعديل</button><button class="btn-danger" onclick="window.deleteContract('${id}')">حذف</button></div>`;
+            div.innerHTML = `<div class="card-header"><div><div class="card-title">${esc(row.contractName||row.hospital)}</div><span class="badge ${st.badge}" style="font-size:10px">${st.text}</span></div><span class="contract-tag ${row.type==='طبي'?'tag-med':'tag-non'}">${row.type}</span></div><div class="card-body"><div class="row"><span>المقاول:</span><b>${esc(cName)}</b></div><div class="row"><span>القيمة:</span><b>${valFmt}</b></div><div class="row"><span>البداية:</span><b>${row.startDate||'-'}</b></div><div class="row"><span>النهاية:</span><b>${row.endDate||'-'}</b></div>${contractProgress(row)}</div>
+            <div class="card-actions" style="display:${actionDisplay}"><button class="btn-primary btn-sm" onclick="window.prepareEditContract('${id}')">تعديل</button><button class="btn-danger btn-sm" onclick="window.deleteContract('${id}')">حذف</button></div>`;
             grid.appendChild(div);
         });
     } else {
         Object.entries(appData.contractors).forEach(([id, row]) => {
             const div = document.createElement('div'); div.className = 'data-card';
             div.innerHTML = `<div class="card-header" style="border:none"><div class="card-title">${esc(row.name)}</div></div>
-            <div class="card-actions" style="display:${actionDisplay}"><button class="btn-primary" data-name="${esc(row.name)}" onclick="window.prepareEditContractor('${id}', this.dataset.name)">تعديل</button><button class="btn-danger" onclick="window.deleteContractor('${id}')">حذف</button></div>`;
+            <div class="card-actions" style="display:${actionDisplay}"><button class="btn-primary btn-sm" data-name="${esc(row.name)}" onclick="window.prepareEditContractor('${id}', this.dataset.name)">تعديل</button><button class="btn-danger btn-sm" onclick="window.deleteContractor('${id}')">حذف</button></div>`;
             grid.appendChild(div);
         });
     }
 }
 
 export function showToast(msg) { const t = document.getElementById("toast"); if(t) { t.innerText = msg; t.className = "show"; setTimeout(() => t.className = "", 2500); } }
-export function exportToExcel() { const ws = XLSX.utils.table_to_sheet(document.getElementById('mainTable')); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "KPI"); XLSX.writeFile(wb, "KPI_Report.xlsx"); }
+// تصدير تفصيلي: صف لكل عقد × شهر (للسنة المختارة) بكل بيانات المستخلص
+export function exportToExcel(appData, userRole, selectedYear) {
+    const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    const now = new Date(); const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const out = [];
+    Object.values(appData.contracts).forEach(c => {
+        if (userRole === 'medical' && c.type !== 'طبي') return;
+        if (userRole === 'non_medical' && c.type !== 'غير طبي') return;
+        const start = new Date(c.startDate); start.setDate(1); start.setHours(0,0,0,0);
+        (appData.monthNames || []).forEach((mName, idx) => {
+            if (!mName.includes(selectedYear)) return;
+            const [mAr, mYear] = mName.split(' '); const cellDate = new Date(parseInt(mYear), arMonths.indexOf(mAr), 1);
+            if (cellDate < start || cellDate > currentMonthStart) return;
+            const md = (c.months && c.months[idx]) || {};
+            const stage = getStage(md);
+            out.push({
+                'العقد': c.contractName || c.hospital || '',
+                'النوع': c.type || '',
+                'المقاول': appData.contractors[c.contractorId]?.name || '',
+                'الشهر': mName,
+                'المرحلة': stage ? STAGES[stage].label : (cellDate.getTime() === currentMonthStart.getTime() ? 'الشهر الجاري' : 'لم يُرفع'),
+                'رقم المستخلص': md.extractNo || '',
+                'رقم الشحنة (المطالبة)': md.claimNum || '',
+                'رقم الفاتورة': md.invoiceNo || md.invoiceNum || '',
+                'رقم الخطاب': md.letterNum || '',
+                'المراجع': md.reviewerName || '',
+                'ملاحظات / سبب الإعادة': md.returnNotes || '',
+                'رابط المستند': md.docLink || '',
+                'آخر تحديث': md.updatedAt ? new Date(md.updatedAt).toLocaleString('ar-SA') : '',
+                'بواسطة': md.updatedBy || ''
+            });
+        });
+    });
+    if (!out.length) { showToast('لا توجد بيانات للتصدير'); return; }
+    const ws = XLSX.utils.json_to_sheet(out);
+    ws['!cols'] = [34, 10, 26, 14, 16, 16, 20, 16, 14, 18, 30, 30, 20, 14].map(w => ({ wch: w }));
+    ws['!views'] = [{ rightToLeft: true }];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "المستخلصات");
+    XLSX.writeFile(wb, `تتبع_المستخلصات_${selectedYear}.xlsx`);
+}
 export function toggleNotifications() { const menu = document.getElementById('notifDropdown'); menu.style.display = (menu.style.display === 'none') ? 'block' : 'none'; }
 export function printReport() { const d = new Date(); document.getElementById('printDate').innerText = d.toLocaleDateString('ar-SA'); window.print(); }
 

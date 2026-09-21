@@ -10,38 +10,48 @@ window.selectedYear = new Date().getFullYear();
 
 // --- 1. Login Logic (Updated for 4 Roles) ---
 window.adminLogin = async function() {
+    const btn = document.getElementById('loginBtn');
     const pwInput = document.getElementById('adminPassword').value;
-    
-    // جلب كلمات المرور المحفوظة (مع قيم افتراضية)
-    const stored = await DB.getPasswords();
+    if (!pwInput) { document.getElementById('adminPassword').focus(); return; }
+    if (btn) { btn.disabled = true; btn.innerText = 'جاري التحقق...'; }
+
+    let stored = {};
+    try { stored = await DB.getPasswords(); } catch (e) { stored = {}; }
     const passwords = {
         super: stored.super || 'super123',
         medical: stored.medical || 'med123',
         non_medical: stored.non_medical || 'nonmed123',
         viewer: stored.viewer || 'view123'
     };
-    
-    // تحديد الصلاحية بناءً على الباسورد
-    if (pwInput === passwords.super) window.userRole = 'super';
-    else if (pwInput === passwords.medical) window.userRole = 'medical';
-    else if (pwInput === passwords.non_medical) window.userRole = 'non_medical';
-    else if (pwInput === passwords.viewer) window.userRole = 'viewer';
-    else {
+
+    let role = null;
+    if (pwInput === passwords.super) role = 'super';
+    else if (pwInput === passwords.medical) role = 'medical';
+    else if (pwInput === passwords.non_medical) role = 'non_medical';
+    else if (pwInput === passwords.viewer) role = 'viewer';
+
+    if (!role) {
+        if (btn) { btn.disabled = false; btn.innerText = 'دخول للنظام'; }
         Swal.fire('خطأ', 'كلمة المرور غير صحيحة', 'error');
         return;
     }
+    try { sessionStorage.setItem('kpi_role', role); } catch (e) {}
+    await startSession(role);
+};
 
-    // إخفاء شاشة الدخول
+// بدء الجلسة (بعد التحقق من كلمة المرور، أو عند استعادة الجلسة بعد تحديث الصفحة)
+async function startSession(role) {
+    window.userRole = role;
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
-
-    // تحديث واجهة المستخدم حسب الصلاحية
     updateUIForRole();
-
-    await loadData();
+    setLoading(true);
+    try { await loadData(); } finally { setLoading(false); }
     refreshView();
-    if(window.userRole === 'super') checkAutoBackup();
-};
+    if (window.userRole === 'super') checkAutoBackup();
+}
+
+function setLoading(on) { const o = document.getElementById('loadingOverlay'); if (o) o.style.display = on ? 'flex' : 'none'; }
 
 function updateUIForRole() {
     const role = window.userRole;
@@ -77,7 +87,7 @@ function updateUIForRole() {
     }
 }
 
-window.logout = function() { location.reload(); };
+window.logout = function() { try { sessionStorage.removeItem('kpi_role'); } catch (e) {} location.reload(); };
 
 // --- 2. Data Loading ---
 async function loadData() {
@@ -90,6 +100,8 @@ async function loadData() {
     } else {
         appData = { contracts: {}, contractors: {}, monthNames: [] };
     }
+    const lu = document.getElementById('lastUpdated');
+    if (lu) lu.innerText = 'آخر تحميل للبيانات: ' + new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
 }
 
 window.refreshView = function() {
@@ -132,12 +144,25 @@ window.setStageFilter = function(stage) {
     refreshView();
 };
 
+window.clearFilters = function() {
+    ['searchHospital', 'searchContractor', 'searchClaim'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const sf = document.getElementById('stageFilter'); if (sf) sf.value = 'all';
+    const tf = document.getElementById('typeFilter'); if (tf && !tf.disabled) tf.value = 'all';
+    refreshView();
+};
+
+let _debounceTimer = null;
+window.debouncedRefresh = function() { clearTimeout(_debounceTimer); _debounceTimer = setTimeout(() => refreshView(), 200); };
+
 // إزالة الحقول الفارغة (Firebase لا يحتاجها) وإرجاع كائن نظيف
 function cleanRecord(obj) {
     const out = {};
     Object.entries(obj).forEach(([k, v]) => { if (v !== '' && v !== undefined && v !== null) out[k] = v; });
     return out;
 }
+
+function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
 // هل رقم المطالبة مستخدم في خلية أخرى؟
 function findDuplicateClaim(claimNum, exceptContractId, exceptIndex) {
@@ -153,7 +178,17 @@ function findDuplicateClaim(claimNum, exceptContractId, exceptIndex) {
     return null;
 }
 
-// --- 3. Popup Handling (تتبع المستخلص) ---
+const STAGE_FLOW = ['', 'at_site', 'at_maintenance', 'at_finance', 'received'];
+const NEEDS_REVIEWER = ['at_maintenance', 'at_finance', 'returned', 'received'];
+const NEEDS_NUMBERS = ['at_finance', 'received'];
+
+function nextStageOf(cur) {
+    if (cur === 'returned') return 'at_maintenance';
+    const i = STAGE_FLOW.indexOf(cur);
+    return (i > -1 && i < STAGE_FLOW.length - 1) ? STAGE_FLOW[i + 1] : '';
+}
+
+// --- 3. نافذة تتبع المستخلص ---
 window.handleKpiCell = async function(contractId, monthIndex) {
     const row = appData.contracts[contractId];
     if (!row || !canEdit(window.userRole, row.type)) return;
@@ -163,46 +198,70 @@ window.handleKpiCell = async function(contractId, monthIndex) {
     const E = UI.esc;
     const monthName = appData.monthNames[monthIndex] || '';
 
-    const stageOptions = `<option value="" ${curStage === '' ? 'selected' : ''}>✘ لم يُرفع بعد</option>` +
-        Object.entries(UI.STAGES).map(([k, S]) => `<option value="${k}" ${curStage === k ? 'selected' : ''}>${S.icon} ${S.label}</option>`).join('');
+    const stepHtml = (key, label, icon, cls) =>
+        `<div class="step ${curStage === key ? 'selected current-mark' : ''}" data-stage="${key}"><span class="pill ${cls}">${UI.svg(icon)}</span>${label}</div>`;
+    const stepper = stepHtml('', 'لم يُرفع', 'x', 'st-late') +
+        ['at_site', 'at_maintenance', 'at_finance', 'received', 'returned'].map(k => stepHtml(k, UI.STAGES[k].label, UI.STAGES[k].icon, 'st-' + k)).join('');
 
     // سجل الحركة (آخر 6)
     const hist = Object.values(cur.history || {}).sort((x, y) => (y.at || 0) - (x.at || 0)).slice(0, 6);
     const stageName = k => k ? UI.STAGES[k].label : 'لم يُرفع';
-    const histHtml = hist.length ? `<div class="popup-full-width claim-history"><label class="popup-label">📜 سجل الحركة</label>${hist.map(h =>
+    const histHtml = hist.length ? `<div class="popup-full-width claim-history"><label class="popup-label">سجل الحركة</label>${hist.map(h =>
         `<div>${new Date(h.at).toLocaleString('ar-SA', { dateStyle: 'short', timeStyle: 'short' })} — ${E(stageName(h.from))} ← <b>${E(stageName(h.to))}</b> — ${E(h.by || '-')}${h.note ? ' — ' + E(h.note) : ''}</div>`).join('')}</div>` : '';
 
     const htmlForm = `
-    <div class="popup-form-container">
-        <div class="popup-full-width"><label class="popup-label">📍 مكان المستخلص الآن</label>
-            <select id="swalStage" class="swal2-select">${stageOptions}</select></div>
-        <div><label class="popup-label">رقم المستخلص</label><input id="swalExtract" class="swal2-input" value="${E(cur.extractNo)}"></div>
-        <div><label class="popup-label">رقم الشحنة (المطالبة)</label><input id="swalClaim" class="swal2-input" value="${E(cur.claimNum)}"></div>
+    <div class="popup-form-container" id="swalForm">
+        <div class="popup-full-width"><label class="popup-label">مكان المستخلص الآن</label>
+            <div class="stepper" id="stepper">${stepper}</div>
+            <input type="hidden" id="swalStage" value="${curStage}">
+            <div class="next-hint" id="nextHint"></div></div>
+        <div><label class="popup-label" id="lblExtract">رقم المستخلص</label><input id="swalExtract" class="swal2-input" value="${E(cur.extractNo)}"></div>
+        <div><label class="popup-label" id="lblClaim">رقم الشحنة (المطالبة)</label><input id="swalClaim" class="swal2-input" value="${E(cur.claimNum)}"></div>
         <div><label class="popup-label">رقم الفاتورة</label><input id="swalInvoice" class="swal2-input" value="${E(cur.invoiceNum || cur.invoiceNo)}"></div>
         <div><label class="popup-label">رقم الخطاب</label><input id="swalLetter" class="swal2-input" value="${E(cur.letterNum)}"></div>
-        <div class="popup-full-width"><label class="popup-label">👤 اسم المراجع</label><input id="swalReviewer" class="swal2-input" value="${E(cur.reviewerName)}"></div>
-        <div class="popup-full-width"><label class="popup-label">رابط المستند</label><input id="swalLink" class="swal2-input" value="${E(cur.docLink)}"></div>
-        <div class="popup-full-width"><label class="popup-label">ملاحظات / سبب الإعادة</label><textarea id="swalReturn" class="swal2-textarea" style="height:70px">${E(cur.returnNotes)}</textarea></div>
+        <div class="popup-full-width"><label class="popup-label" id="lblReviewer">اسم المراجع</label><input id="swalReviewer" class="swal2-input" value="${E(cur.reviewerName)}"></div>
+        <div class="popup-full-width"><label class="popup-label">رابط المستند</label><input id="swalLink" class="swal2-input" value="${E(cur.docLink)}" placeholder="https://"></div>
+        <div class="popup-full-width"><label class="popup-label" id="lblReturn">ملاحظات / سبب الإعادة</label><textarea id="swalReturn" class="swal2-textarea" style="height:64px">${E(cur.returnNotes)}</textarea></div>
         ${histHtml}
     </div>`;
+
+    const $ = id => document.getElementById(id);
+    const refreshForm = () => {
+        const st = $('swalStage').value;
+        document.querySelectorAll('#stepper .step').forEach(el => el.classList.toggle('selected', el.dataset.stage === st));
+        $('lblReviewer').classList.toggle('required', NEEDS_REVIEWER.includes(st));
+        $('lblExtract').classList.toggle('required', NEEDS_NUMBERS.includes(st));
+        $('lblClaim').classList.toggle('required', NEEDS_NUMBERS.includes(st));
+        $('lblReturn').classList.toggle('required', st === 'returned');
+        const nx = nextStageOf(st);
+        $('nextHint').innerHTML = nx ? `الخطوة التالية: <a data-go="${nx}">${UI.STAGES[nx].label}</a>` : '';
+        if (NEEDS_REVIEWER.includes(st) && !$('swalReviewer').value.trim()) $('swalReviewer').value = lsGet('kpi_last_reviewer');
+    };
 
     let dupAccepted = null;
     const { value: f } = await Swal.fire({
         title: `${E(row.contractName || row.hospital || '')} — ${E(monthName)}`,
         html: htmlForm,
-        width: '620px',
+        width: '680px',
         showCancelButton: true,
         confirmButtonText: 'حفظ',
         cancelButtonText: 'إلغاء',
+        didOpen: () => {
+            $('stepper').addEventListener('click', e => { const s = e.target.closest('.step'); if (!s) return; $('swalStage').value = s.dataset.stage; refreshForm(); });
+            $('nextHint').addEventListener('click', e => { const a = e.target.closest('a[data-go]'); if (!a) return; $('swalStage').value = a.dataset.go; refreshForm(); });
+            $('swalForm').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); Swal.clickConfirm(); } });
+            refreshForm();
+            const st = $('swalStage').value;
+            const focusId = NEEDS_REVIEWER.includes(st) && !$('swalReviewer').value.trim() ? 'swalReviewer' : (!$('swalExtract').value ? 'swalExtract' : 'swalClaim');
+            const el = $(focusId); if (el) el.focus();
+        },
         preConfirm: () => {
-            const v = id => document.getElementById(id).value.trim();
+            const v = id => $(id).value.trim();
             const f = { stage: v('swalStage'), extractNo: v('swalExtract'), claimNum: v('swalClaim'), invoiceNo: v('swalInvoice'),
                         letterNum: v('swalLetter'), reviewerName: v('swalReviewer'), docLink: v('swalLink'), returnNotes: v('swalReturn') };
-            const needReviewer = ['at_maintenance', 'at_finance', 'returned', 'received'].includes(f.stage);
-            const needNumbers = ['at_finance', 'received'].includes(f.stage);
-            if (needReviewer && !f.reviewerName) { Swal.showValidationMessage('اكتب اسم المراجع'); return false; }
-            if (needNumbers && !f.extractNo) { Swal.showValidationMessage('رقم المستخلص مطلوب قبل الرفع للمالية'); return false; }
-            if (needNumbers && !f.claimNum) { Swal.showValidationMessage('رقم الشحنة (المطالبة) مطلوب قبل الرفع للمالية'); return false; }
+            if (NEEDS_REVIEWER.includes(f.stage) && !f.reviewerName) { Swal.showValidationMessage('اكتب اسم المراجع'); return false; }
+            if (NEEDS_NUMBERS.includes(f.stage) && !f.extractNo) { Swal.showValidationMessage('رقم المستخلص مطلوب قبل الرفع للمالية'); return false; }
+            if (NEEDS_NUMBERS.includes(f.stage) && !f.claimNum) { Swal.showValidationMessage('رقم الشحنة (المطالبة) مطلوب قبل الرفع للمالية'); return false; }
             if (f.stage === 'received' && !['at_finance', 'received'].includes(curStage)) { Swal.showValidationMessage('لا يمكن تسجيل الاستلام قبل الرفع للمالية'); return false; }
             if (f.stage === 'returned' && !f.returnNotes) { Swal.showValidationMessage('اكتب سبب الإعادة في الملاحظات'); return false; }
             if (f.docLink && !/^https?:\/\//i.test(f.docLink)) { Swal.showValidationMessage('رابط المستند يجب أن يبدأ بـ http أو https'); return false; }
@@ -218,10 +277,12 @@ window.handleKpiCell = async function(contractId, monthIndex) {
         }
     });
     if (!f) return;
+    if (f.reviewerName) lsSet('kpi_last_reviewer', f.reviewerName);
 
     const nowTs = Date.now();
     const oldHist = Object.values(cur.history || {});
-    const newHist = (f.stage !== curStage)
+    const changed = f.stage !== curStage;
+    const newHist = changed
         ? [...oldHist, cleanRecord({ from: curStage, to: f.stage, by: roleLabel(), at: nowTs, note: f.returnNotes })]
         : oldHist;
 
@@ -229,7 +290,7 @@ window.handleKpiCell = async function(contractId, monthIndex) {
     const localRec = { ...base, updatedAt: nowTs, history: newHist };
     // للحفظ: الأوقات من ساعة السيرفر (آخر عنصر في السجل فقط جديد)
     const toSave = { ...base, updatedAt: DB.serverTs(),
-        history: newHist.map((h, i) => (i === newHist.length - 1 && f.stage !== curStage) ? { ...h, at: DB.serverTs() } : h) };
+        history: newHist.map((h, i) => (changed && i === newHist.length - 1) ? { ...h, at: DB.serverTs() } : h) };
     if (!toSave.history.length) delete toSave.history;
     if (!localRec.history.length) delete localRec.history;
 
@@ -242,7 +303,106 @@ window.handleKpiCell = async function(contractId, monthIndex) {
     if (!row.months) row.months = [];
     row.months[monthIndex] = localRec;
     refreshView();
-    UI.showToast("تم التحديث ✅");
+    UI.showToast("تم التحديث");
+};
+
+// --- تحديث جماعي: نقل عدة عقود لنفس المرحلة في شهر واحد ---
+window.openBulkUpdate = async function() {
+    if (window.userRole === 'viewer') return;
+    const E = UI.esc;
+    const arMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    const names = appData.monthNames || [];
+    if (!names.length) { Swal.fire('تنبيه', 'لا توجد شهور مضافة', 'info'); return; }
+
+    const prev = new Date(); prev.setDate(1); prev.setMonth(prev.getMonth() - 1);
+    let defIdx = names.indexOf(`${arMonths[prev.getMonth()]} ${prev.getFullYear()}`); if (defIdx < 0) defIdx = 0;
+
+    const monthOptions = names.map((n, i) => `<option value="${i}" ${i === defIdx ? 'selected' : ''}>${E(n)}</option>`).join('');
+    const htmlForm = `
+    <div class="popup-form-container" id="bulkForm">
+        <div><label class="popup-label">الشهر</label><select id="bkMonth" class="swal2-select">${monthOptions}</select></div>
+        <div><label class="popup-label">نقل المستخلصات إلى</label>
+            <select id="bkStage" class="swal2-select"><option value="at_maintenance">في إدارة الصيانة</option><option value="at_site">عند الموقع</option></select></div>
+        <div class="popup-full-width"><label class="popup-label" id="bkRevLbl">اسم المراجع</label><input id="bkReviewer" class="swal2-input" value="${E(lsGet('kpi_last_reviewer'))}"></div>
+        <div class="popup-full-width"><div class="bulk-tools"><span id="bkCount"></span><a id="bkAll">تحديد الكل</a><a id="bkNone">إلغاء التحديد</a></div>
+            <div class="bulk-list" id="bkList"></div></div>
+    </div>`;
+    const $ = id => document.getElementById(id);
+
+    const renderList = () => {
+        const idx = parseInt($('bkMonth').value);
+        const target = $('bkStage').value;
+        const [mAr, mYear] = (names[idx] || '').split(' ');
+        const cellDate = new Date(parseInt(mYear), arMonths.indexOf(mAr), 1);
+        const items = Object.entries(appData.contracts)
+            .filter(([, c]) => canEdit(window.userRole, c.type))
+            .filter(([, c]) => { const s = new Date(c.startDate); s.setDate(1); s.setHours(0,0,0,0); return cellDate >= s; })
+            .sort(([, a], [, b]) => (a.contractName || a.hospital || '').localeCompare(b.contractName || b.hospital || '', 'ar'));
+        $('bkList').innerHTML = items.map(([id, c]) => {
+            const st = UI.getStage((c.months || [])[idx]);
+            const locked = ['at_finance', 'received'].includes(st) || st === target;
+            const S = st ? UI.STAGES[st] : null;
+            return `<label class="bulk-row"><input type="checkbox" class="bk-cb" value="${id}" ${locked ? 'disabled' : 'checked'}>
+                <span class="bn">${E(c.contractName || c.hospital || id)}</span>
+                <span class="pill ${st ? 'st-' + st : 'st-late'}">${UI.svg(S ? S.icon : 'x')}</span>
+                <small style="color:#6b7788;min-width:96px">${S ? S.label : 'لم يُرفع'}</small></label>`;
+        }).join('') || '<div class="empty-state">لا توجد عقود مناسبة لهذا الشهر</div>';
+        updateCount();
+    };
+    const updateCount = () => { const n = document.querySelectorAll('.bk-cb:checked').length; $('bkCount').innerText = `المحدد: ${n} عقد`; };
+
+    const { value: sel } = await Swal.fire({
+        title: 'تحديث جماعي للمستخلصات',
+        html: htmlForm,
+        width: '700px',
+        showCancelButton: true,
+        confirmButtonText: 'تنفيذ النقل',
+        cancelButtonText: 'إلغاء',
+        didOpen: () => {
+            $('bkMonth').addEventListener('change', renderList);
+            $('bkStage').addEventListener('change', () => { $('bkRevLbl').classList.toggle('required', $('bkStage').value === 'at_maintenance'); renderList(); });
+            $('bkList').addEventListener('change', updateCount);
+            $('bkAll').addEventListener('click', () => { document.querySelectorAll('.bk-cb:not(:disabled)').forEach(cb => cb.checked = true); updateCount(); });
+            $('bkNone').addEventListener('click', () => { document.querySelectorAll('.bk-cb').forEach(cb => cb.checked = false); updateCount(); });
+            $('bkRevLbl').classList.add('required');
+            renderList();
+        },
+        preConfirm: () => {
+            const ids = Array.from(document.querySelectorAll('.bk-cb:checked')).map(cb => cb.value);
+            const stage = $('bkStage').value, reviewer = $('bkReviewer').value.trim();
+            if (!ids.length) { Swal.showValidationMessage('اختر عقدًا واحدًا على الأقل'); return false; }
+            if (NEEDS_REVIEWER.includes(stage) && !reviewer) { Swal.showValidationMessage('اكتب اسم المراجع'); return false; }
+            return { ids, stage, reviewer, idx: parseInt($('bkMonth').value) };
+        }
+    });
+    if (!sel) return;
+    if (sel.reviewer) lsSet('kpi_last_reviewer', sel.reviewer);
+
+    const nowTs = Date.now();
+    const updates = {}, locals = {};
+    sel.ids.forEach(id => {
+        const c = appData.contracts[id]; if (!c || !canEdit(window.userRole, c.type)) return;
+        const cur = (c.months || [])[sel.idx] || {};
+        const from = UI.getStage(cur);
+        if (['at_finance', 'received'].includes(from) || from === sel.stage) return;
+        const hist = [...Object.values(cur.history || {}), cleanRecord({ from, to: sel.stage, by: roleLabel(), at: nowTs })];
+        const base = cleanRecord({ ...cur, history: undefined, stage: sel.stage, financeStatus: UI.deriveFinanceStatus(sel.stage),
+                                   reviewerName: sel.reviewer || cur.reviewerName, updatedBy: roleLabel() });
+        locals[id] = { ...base, updatedAt: nowTs, history: hist };
+        updates[`${id}/months/${sel.idx}`] = { ...base, updatedAt: DB.serverTs(),
+            history: hist.map((h, i) => i === hist.length - 1 ? { ...h, at: DB.serverTs() } : h) };
+    });
+    const n = Object.keys(updates).length;
+    if (!n) { UI.showToast('لا يوجد ما يتم تحديثه'); return; }
+    try {
+        await DB.updateData('app_db_v2/contracts', updates);
+    } catch (e) {
+        Swal.fire('تعذر الحفظ', 'حدث خطأ أثناء الحفظ، لم يتم تغيير أي عقد. حاول مرة أخرى', 'error');
+        return;
+    }
+    Object.entries(locals).forEach(([id, rec]) => { const c = appData.contracts[id]; if (!c.months) c.months = []; c.months[sel.idx] = rec; });
+    refreshView();
+    UI.showToast(`تم تحديث ${n} عقد`);
 };
 
 window.editNote = async function(id) {
@@ -530,7 +690,7 @@ window.switchTab = function(tabName) {
 };
 
 window.renderCards = function(type) { UI.renderCards(appData, type); };
-window.exportToExcel = function() { UI.exportToExcel(); };
+window.exportToExcel = function() { UI.exportToExcel(appData, window.userRole, window.selectedYear); };
 window.toggleNotifications = function() { UI.toggleNotifications(); };
 // js/app.js (في النهاية)
 window.printReport = function() {
@@ -751,3 +911,31 @@ window.openCustomPrint = async function() {
         });
     }
 };
+
+
+// --- سلوكيات عامة ---
+// إغلاق القوائم المنسدلة عند الضغط خارجها أو على أحد عناصرها
+document.addEventListener('click', e => {
+    document.querySelectorAll('details.menu[open]').forEach(d => {
+        if (!d.contains(e.target)) d.removeAttribute('open');
+        else if (e.target.closest('.menu-list button')) setTimeout(() => d.removeAttribute('open'), 0);
+    });
+    const nd = document.getElementById('notifDropdown');
+    if (nd && nd.style.display === 'block' && !e.target.closest('.notif-wrap')) nd.style.display = 'none';
+});
+
+// اختصار: الضغط على / يفتح البحث
+document.addEventListener('keydown', e => {
+    if (e.key !== '/' || e.ctrlKey || e.metaKey) return;
+    const t = e.target.tagName;
+    if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || document.getElementById('swalForm') || document.getElementById('bulkForm')) return;
+    const box = document.getElementById('searchHospital');
+    if (box && document.getElementById('dashboard').style.display !== 'none') { e.preventDefault(); box.focus(); }
+});
+
+// استعادة الجلسة بعد تحديث الصفحة (تنتهي بإغلاق التبويب)
+(function restoreSession() {
+    let role = null;
+    try { role = sessionStorage.getItem('kpi_role'); } catch (e) {}
+    if (['super', 'medical', 'non_medical', 'viewer'].includes(role)) startSession(role);
+})();
