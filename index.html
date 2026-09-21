@@ -87,16 +87,25 @@
                 <div class="toolbar-section">
                     <input type="text" id="searchHospital" class="form-control" placeholder="بحث باسم العقد/المستشفى..." onkeyup="window.refreshView()">
                     <input type="text" id="searchContractor" class="form-control" placeholder="بحث بالمقاول..." onkeyup="window.refreshView()">
-                    <input type="text" id="searchClaim" class="form-control" placeholder="بحث برقم المطالبة..." onkeyup="window.refreshView()">
+                    <input type="text" id="searchClaim" class="form-control" placeholder="بحث برقم المطالبة / المستخلص / المراجع..." onkeyup="window.refreshView()">
                     <select id="typeFilter" class="form-control" onchange="window.refreshView()">
                         <option value="all">كل الأنواع</option>
                         <option value="طبي">طبي</option>
                         <option value="غير طبي">غير طبي</option>
                     </select>
-                    <button class="btn-success" onclick="window.exportToExcel()">Excel Export</button>
+                    <select id="stageFilter" class="form-control" onchange="window.refreshView()">
+<option value="all">كل المراحل</option>
+<option value="at_site">🏗️ عند الموقع</option>
+<option value="at_maintenance">🛠️ في إدارة الصيانة</option>
+<option value="at_finance">✅ مرفوع للمالية</option>
+<option value="returned">⚠️ مرتجع</option>
+<option value="received">📦 تم استلام الشحنة</option>
+</select>
+<button class="btn-success" onclick="window.exportToExcel()">Excel Export</button>
                 </div>
 
-                <div id="yearTabs" class="year-tabs-container"></div>
+                <div id="stageSummary" class="stage-summary"></div>
+<div id="yearTabs" class="year-tabs-container"></div>
 
                 <div class="table-wrapper">
                     <table id="mainTable">
