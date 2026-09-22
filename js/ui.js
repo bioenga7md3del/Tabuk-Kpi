@@ -70,22 +70,32 @@ function getContractStatus(start, end) {
 const ICONS = {
     site: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
     maint: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+    eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
     check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
     returned: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
     package: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
     x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
     clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    lock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
     dash: '<line x1="6" y1="12" x2="18" y2="12"/>'
 };
 export function svg(name) { return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`; }
 
+// أسماء الأشهر بالعربية + مساعد لمعرفة هل اسم شهر معين هو الشهر الجاري (لقفل التعديل فيه)
+const AR_MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+export function isCurrentMonthName(name) {
+    const now = new Date();
+    return name === `${AR_MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+}
+
 // --- مراحل المستخلص: مكانه الآن ---
+// الترتيب: عند الموقع ← تحت المراجعة ← استلام شحنة ← مرفوع للمالية، والمرتجع يرجع للموقع بعد المراجعة
 export const STAGES = {
     at_site:        { label: 'عند الموقع',        icon: 'site',    color: '#c2410c' },
-    at_maintenance: { label: 'في إدارة الصيانة',  icon: 'maint',   color: '#1d5fa8' },
+    at_maintenance: { label: 'تحت المراجعة',      icon: 'eye',     color: '#1d5fa8' },
+    received:       { label: 'تم استلام الشحنة',  icon: 'package', color: '#0f766e' },
     at_finance:     { label: 'مرفوع للمالية',     icon: 'check',   color: '#1a7f4b' },
-    returned:       { label: 'مرتجع',             icon: 'returned', color: '#a16207' },
-    received:       { label: 'تم استلام الشحنة',  icon: 'package', color: '#0f766e' }
+    returned:       { label: 'مرتجع للموقع',      icon: 'returned', color: '#a16207' }
 };
 
 // يقرأ مرحلة الخلية، مع دعم البيانات القديمة (financeStatus فقط)
@@ -98,8 +108,14 @@ export function getStage(md) {
 }
 
 // financeStatus القديم يُشتق من المرحلة حتى تظل الإحصائيات والطباعة تعمل
-export function deriveFinanceStatus(stage) {
-    if (stage === 'at_finance' || stage === 'received') return 'sent';
+// ملاحظة: "استلام الشحنة" أصبحت قبل "الرفع للمالية"، فلا تُحتسب "مرفوعة" فعلاً
+// إلا لو مرّت بالفعل بمرحلة "مرفوع للمالية" (نتأكد من ذلك عبر سجل الحركة، لتوافق البيانات القديمة)
+export function deriveFinanceStatus(stage, history) {
+    if (stage === 'at_finance') return 'sent';
+    if (stage === 'received') {
+        const hist = history ? Object.values(history) : [];
+        return hist.some(h => h && h.to === 'at_finance') ? 'sent' : 'late';
+    }
     if (stage === 'returned') return 'returned';
     return 'late';
 }
@@ -145,7 +161,7 @@ export function updateStageSummary(rows, appData, selectedYear) {
             <span class="pill st-${k}">${svg(S.icon)}</span><span>${S.label}</span><b style="background:${S.color}">${counts[k]}</b></div>`; };
     const arrow = '<span class="stage-arrow">←</span>';
     box.innerHTML = `<span class="year-label">مسار المستخلص</span>` +
-        ['at_site', 'at_maintenance', 'at_finance', 'received'].map(chip).join(arrow) +
+        ['at_site', 'at_maintenance', 'received', 'at_finance'].map(chip).join(arrow) +
         `<span class="stage-arrow" style="margin:0 8px">|</span>` + chip('returned');
 }
 
@@ -165,7 +181,7 @@ function renderLegend() {
     const pill = (cls, icon, label) => `<div class="legend-item"><span class="pill ${cls}">${svg(icon)}</span><span>${label}</span></div>`;
     div.innerHTML =
         Object.entries(STAGES).map(([k, S]) => pill('st-' + k, S.icon, S.label)).join('') +
-        pill('st-late', 'x', 'لم يُرفع (متأخر)') + pill('st-pending', 'clock', 'الشهر الجاري') +
+        pill('st-late', 'x', 'لم يُرفع (متأخر)') + pill('st-pending', 'lock', 'الشهر الجاري (مقفل للتعديل)') +
         `<div style="flex-basis:100%;height:0"></div>` +
         `<div class="legend-item"><div class="legend-box" style="background:#fff3e0;border-bottom:3px solid #f2a65a"></div><span>فترة ختامية (آخر 5 شهور)</span></div>` +
         `<div class="legend-item"><div class="legend-box" style="background:#f6eefb;border-bottom:3px solid #a66bc4"></div><span>تمديد 10%</span></div>` +
@@ -289,8 +305,10 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                     ti = cellTip(md, stage) + periodLabel;
                 } else if (isBeforeContract) {
                     pillCls = 'st-closed'; icon = 'dash'; ti = 'قبل بداية العقد (مغلق)';
-                } else if (isCurrentMonth) {
-                    pillCls = 'st-pending'; icon = 'clock'; ti = 'الشهر الجاري (لم ينتهِ بعد)';
+                }
+                if (isCurrentMonth) {
+                    ti += (ti ? '\n' : '') + 'الشهر الجاري — القيد مقفل للتعديل حتى نهايته';
+                    if (!sub) sub = 'مقفل';
                 }
 
                 const classes = ['cell'];
@@ -301,7 +319,7 @@ export function renderTable(appData, userRole, canEditFunc, selectedYear) {
                 if (isCurrentMonth) classes.push('cur-month');
                 if (sClaim !== "" && [md.claimNum, md.extractNo, md.reviewerName].some(v => v && v.toString().toLowerCase().includes(sClaim))) classes.push('hl-claim');
 
-                const canClick = (userRole !== 'viewer') && canEditFunc(userRole, row.type) && !isBeforeContract;
+                const canClick = (userRole !== 'viewer') && canEditFunc(userRole, row.type) && !isBeforeContract && !isCurrentMonth;
                 if (canClick) classes.push('clickable');
                 const outline = (sStage !== "all" && stage === sStage) ? ` style="box-shadow: inset 0 0 0 2px ${STAGES[sStage].color}"` : '';
                 const clickAttr = canClick ? `onclick="window.handleKpiCell('${row.id}', ${originalIndex})"` : '';
@@ -452,7 +470,7 @@ export function updateStats(rows, appData, selectedYear) {
     let active = 0, expired = 0;
     rows.forEach(r => { const st = getContractStatus(r.startDate, r.endDate); if(st.text.includes('ساري') || st.text.includes('تمديد') || st.text.includes('وشك')) active++; else expired++; });
 
-    const elHosp = document.getElementById('countHospitals'); if (elHosp) elHosp.innerText = new Set(rows.map(r=>r.hospital)).size;
+    const elHosp = document.getElementById('countHospitals'); if (elHosp) elHosp.innerText = new Set(rows.map(r => (r.contractName || r.hospital || '').trim()).filter(Boolean)).size;
     const elCont = document.getElementById('countContracts'); if (elCont) elCont.innerText = rows.length;
     const elLate = document.getElementById('countLate'); if (elLate) elLate.innerText = totalLate;
     const elActive = document.getElementById('countActive'); if (elActive) elActive.innerText = active;

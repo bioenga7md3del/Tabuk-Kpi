@@ -218,7 +218,7 @@ function findDuplicateClaim(claimNum, exceptContractId, exceptIndex) {
     return null;
 }
 
-const STAGE_FLOW = ['', 'at_site', 'at_maintenance', 'at_finance', 'received'];
+const STAGE_FLOW = ['', 'at_site', 'at_maintenance', 'received', 'at_finance'];
 const NEEDS_REVIEWER = ['at_maintenance', 'at_finance', 'returned', 'received'];
 const NEEDS_NUMBERS = ['at_finance', 'received'];
 
@@ -232,16 +232,17 @@ function nextStageOf(cur) {
 window.handleKpiCell = async function(contractId, monthIndex) {
     const row = appData.contracts[contractId];
     if (!row || !canEdit(window.userRole, row.type)) return;
+    const monthName = appData.monthNames[monthIndex] || '';
+    if (UI.isCurrentMonthName(monthName)) { UI.showToast('الشهر الجاري مقفل للتعديل حتى نهايته'); return; }
 
     const cur = (row.months && row.months[monthIndex]) ? row.months[monthIndex] : {};
     const curStage = UI.getStage(cur);
     const E = UI.esc;
-    const monthName = appData.monthNames[monthIndex] || '';
 
     const stepHtml = (key, label, icon, cls) =>
         `<div class="step ${curStage === key ? 'selected current-mark' : ''}" data-stage="${key}"><span class="pill ${cls}">${UI.svg(icon)}</span>${label}</div>`;
     const stepper = stepHtml('', 'لم يُرفع', 'x', 'st-late') +
-        ['at_site', 'at_maintenance', 'at_finance', 'received', 'returned'].map(k => stepHtml(k, UI.STAGES[k].label, UI.STAGES[k].icon, 'st-' + k)).join('');
+        ['at_site', 'at_maintenance', 'received', 'at_finance', 'returned'].map(k => stepHtml(k, UI.STAGES[k].label, UI.STAGES[k].icon, 'st-' + k)).join('');
 
     // سجل الحركة (آخر 6)
     const hist = Object.values(cur.history || {}).sort((x, y) => (y.at || 0) - (x.at || 0)).slice(0, 6);
@@ -302,7 +303,7 @@ window.handleKpiCell = async function(contractId, monthIndex) {
             if (NEEDS_REVIEWER.includes(f.stage) && !f.reviewerName) { Swal.showValidationMessage('اكتب اسم المراجع'); return false; }
             if (NEEDS_NUMBERS.includes(f.stage) && !f.extractNo) { Swal.showValidationMessage('رقم المستخلص مطلوب قبل الرفع للمالية'); return false; }
             if (NEEDS_NUMBERS.includes(f.stage) && !f.claimNum) { Swal.showValidationMessage('رقم الشحنة (المطالبة) مطلوب قبل الرفع للمالية'); return false; }
-            if (f.stage === 'received' && !['at_finance', 'received'].includes(curStage)) { Swal.showValidationMessage('لا يمكن تسجيل الاستلام قبل الرفع للمالية'); return false; }
+            if (f.stage === 'at_finance' && !['received', 'at_finance'].includes(curStage)) { Swal.showValidationMessage('لا يمكن الرفع للمالية قبل استلام الشحنة'); return false; }
             if (f.stage === 'returned' && !f.returnNotes) { Swal.showValidationMessage('اكتب سبب الإعادة في الملاحظات'); return false; }
             if (f.docLink && !/^https?:\/\//i.test(f.docLink)) { Swal.showValidationMessage('رابط المستند يجب أن يبدأ بـ http أو https'); return false; }
             if (f.claimNum) {
@@ -326,7 +327,7 @@ window.handleKpiCell = async function(contractId, monthIndex) {
         ? [...oldHist, cleanRecord({ from: curStage, to: f.stage, by: roleLabel(), at: nowTs, note: f.returnNotes })]
         : oldHist;
 
-    const base = cleanRecord({ ...f, financeStatus: UI.deriveFinanceStatus(f.stage), updatedBy: roleLabel() });
+    const base = cleanRecord({ ...f, financeStatus: UI.deriveFinanceStatus(f.stage, newHist), updatedBy: roleLabel() });
     const localRec = { ...base, updatedAt: nowTs, history: newHist };
     // للحفظ: الأوقات من ساعة السيرفر (آخر عنصر في السجل فقط جديد)
     const toSave = { ...base, updatedAt: DB.serverTs(),
@@ -357,12 +358,15 @@ window.openBulkUpdate = async function() {
     const prev = new Date(); prev.setDate(1); prev.setMonth(prev.getMonth() - 1);
     let defIdx = names.indexOf(`${arMonths[prev.getMonth()]} ${prev.getFullYear()}`); if (defIdx < 0) defIdx = 0;
 
-    const monthOptions = names.map((n, i) => `<option value="${i}" ${i === defIdx ? 'selected' : ''}>${E(n)}</option>`).join('');
+    // الشهر الجاري مقفل للتعديل، فلا يظهر ضمن خيارات التحديث الجماعي
+    const monthOptions = names.map((n, i) => UI.isCurrentMonthName(n) ? '' : `<option value="${i}" ${i === defIdx ? 'selected' : ''}>${E(n)}</option>`).join('');
+    if (!monthOptions) { Swal.fire('تنبيه', 'لا توجد شهور متاحة للتحديث الجماعي حالياً', 'info'); return; }
     const htmlForm = `
     <div class="popup-form-container" id="bulkForm">
-        <div><label class="popup-label">الشهر</label><select id="bkMonth" class="swal2-select">${monthOptions}</select></div>
+        <div><label class="popup-label">الشهر</label><select id="bkMonth" class="swal2-select">${monthOptions}</select>
+            <small style="color:#8b96a8">الشهر الجاري غير متاح هنا لأنه ما زال مقفلاً للتعديل</small></div>
         <div><label class="popup-label">نقل المستخلصات إلى</label>
-            <select id="bkStage" class="swal2-select"><option value="at_maintenance">في إدارة الصيانة</option><option value="at_site">عند الموقع</option></select></div>
+            <select id="bkStage" class="swal2-select"><option value="at_maintenance">تحت المراجعة</option><option value="at_site">عند الموقع</option></select></div>
         <div class="popup-full-width"><label class="popup-label" id="bkRevLbl">اسم المراجع</label><input id="bkReviewer" class="swal2-input" value="${E(lsGet('kpi_last_reviewer'))}"></div>
         <div class="popup-full-width"><div class="bulk-tools"><span id="bkCount"></span><a id="bkAll">تحديد الكل</a><a id="bkNone">إلغاء التحديد</a></div>
             <div class="bulk-list" id="bkList"></div></div>
